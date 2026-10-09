@@ -15,7 +15,6 @@
 #include "engine.h"
 #include "gen/font.h"
 
-extern const uint8_t ui_tiles[];
 extern const uint8_t shape_names[];
 extern const uint8_t dual_names[];
 extern const uint8_t kit_names[];
@@ -27,7 +26,11 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED;
 #define SCR_PATCH 2
 #define SCR_NAME 3
 #define SCR_SETUP 4
-#define SETUP_ITEMS 6 /* BASE + 5 voice channels */
+#define SCR_MON 5
+#define SETUP_ITEMS 9 /* SHIFT ALL, 5 voice channels, VELOCITY, SCREEN OFF, MONITOR */
+#define SI_VEL 6
+#define SI_SCREEN 7
+#define SI_MON 8
 
 #define ROWS 18
 #define EDIT_FIRST 2
@@ -52,6 +55,10 @@ static const char *flash_msg;
 
 static uint8_t keys, keys_prev, rep;
 static uint8_t scur, setup_changed;
+static uint8_t sel_pending, lcd_off;
+static uint16_t mon_shown;
+static uint8_t clip[PATCH_SIZE];
+static uint8_t clip_type = 0xFF;
 static void go(uint8_t s);
 static uint8_t audition;       /* note being auditioned + 1 */
 
@@ -125,6 +132,7 @@ static void dirty_all(void) {
 /* ------------------------------------------------------------------ names / labels */
 static const char *const type_short[NUM_VOICES] = { "PU1", "PU2", "WAV", "NOI", "DRM" };
 static const char *const type_long[NUM_VOICES] = { "PULSE 1", "PULSE 2", "WAVE", "NOISE", "DRUMS" };
+static const char *const vel_names[4] = { "LINEAR", "SOFT", "HARD", "FIXED" };
 static const char *const mode_names[WM_COUNT] = { "SYNTH", "PULSE", "TRI", "DUAL", "DRUMS", "SPEECH", "SING" };
 static const char *const duty_names[4] = { "12.5%", "25%", "50%", "75%" };
 static const char *const pan_names[3] = { "LEFT", "CENTER", "RIGHT" };
@@ -166,6 +174,7 @@ static const char *param_label(uint8_t v, uint8_t p) {
     case P_SPLIT: return "DRUM SPLIT";
     case P_SPEECH_PITCH: return "VOICE PCH";
     case P_PHONEME: return "PHONEME";
+    case P_LEGATO: return "LEGATO";
     }
     return "?";
 }
@@ -227,6 +236,7 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
         lnote(x + 1, val, base);
         return;
     case P_SPEECH_PITCH: lnote(x, val, base); return;
+    case P_LEGATO: lput(x, val ? "ON" : "OFF", base); return;
     case P_PHONEME:
         x = lnum(x, val, base);
         lputn(x + 1, &phoneme_names[(uint16_t)val * 2], 2, base);
@@ -236,11 +246,11 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
 }
 
 /* ------------------------------------------------------------------ param list */
-static const uint8_t order_pulse[] = { P_LEVEL, P_PAN, P_SHAPE, P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_BEND,
-                                       P_DETUNE, P_PENV_AMT, P_PENV_TIME, P_SWEEP, P_LFO_SHAPE, P_LFO_RATE,
+static const uint8_t order_pulse[] = { P_LEVEL, P_PAN, P_SHAPE, P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_LEGATO,
+                                       P_BEND, P_DETUNE, P_PENV_AMT, P_PENV_TIME, P_SWEEP, P_LFO_SHAPE, P_LFO_RATE,
                                        P_LFO_DEPTH, P_LFO_DEST, P_LFO_DELAY, 0xFF };
 static const uint8_t order_wave[] = { P_MODE, P_SHAPE, P_TIMBRE, P_SPEECH_PITCH, P_PHONEME, P_LEVEL, P_PAN,
-                                      P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_BEND, P_DETUNE, P_PENV_AMT,
+                                      P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_LEGATO, P_BEND, P_DETUNE, P_PENV_AMT,
                                       P_PENV_TIME, P_LFO_SHAPE, P_LFO_RATE, P_LFO_DEPTH, P_LFO_DEST,
                                       P_LFO_DELAY, P_SPLIT, 0xFF };
 
@@ -266,6 +276,7 @@ static void build_plist(void) {
                 if ((mode == WM_PULSE || mode == WM_TRI) && p == P_TIMBRE) continue;
                 if (p == P_SPEECH_PITCH && mode != WM_SPEECH) continue;
                 if (p == P_PHONEME && mode != WM_SING) continue;
+                if (p == P_LEGATO && (mode == WM_SPEECH || mode == WM_SING || mode == WM_DRUMS)) continue;
             }
             plist[pcount++] = p;
         }
@@ -471,7 +482,7 @@ static uint8_t setup_base(void) {
 static void draw_setup_row(uint8_t y) {
     lclear();
     if (y == 0) {
-        draw_header("MIDI CHANNELS");
+        draw_header("SETUP");
         lput(15, "V" VERSION_STR, T_INV);
     } else if (y >= 2 && y < 2 + SETUP_ITEMS) {
         uint8_t i = y - 2;
@@ -490,6 +501,15 @@ static void draw_setup_row(uint8_t y) {
                 lput(x, "-", 0);
                 lnum(x + 1, b + 5, 0);
             }
+        } else if (i == SI_VEL) {
+            lput(1, "VELOCITY", on ? T_INV : T_DIM);
+            lput(12, vel_names[vel_curve & 3], 0);
+        } else if (i == SI_SCREEN) {
+            lput(1, "SCREEN OFF", on ? T_INV : T_DIM);
+            lput(12, "A:GO", 0);
+        } else if (i == SI_MON) {
+            lput(1, "MIDI MONITOR", on ? T_INV : T_DIM);
+            lput(14, "A:GO", 0);
         } else {
             uint8_t v = i - 1;
             lput(1, type_long[v], on ? T_INV : T_DIM);
@@ -499,16 +519,14 @@ static void draw_setup_row(uint8_t y) {
                 lnum(15, midi_ch[v] + 1, 0);
             }
         }
-    } else if (y == 10) {
-        lput(1, "SAME CH = LAYERED", T_DIM);
     } else if (y == 12) {
-        lput(1, "ARDUINOBOY USERS:", T_DIM);
-    } else if (y == 13) {
-        lput(1, "KEEP 1-5 HERE, SET", T_DIM);
+        lput(1, "SAME CH = LAYERED", T_DIM);
     } else if (y == 14) {
-        lput(1, "THE SHIFT IN THE", T_DIM);
+        lput(1, "ARDUINOBOY: USE 1-5", T_DIM);
     } else if (y == 15) {
-        lput(1, "ARDUINOBOY ITSELF", T_DIM);
+        lput(1, "AND SET THE SHIFT", T_DIM);
+    } else if (y == 16) {
+        lput(1, "IN THE ARDUINOBOY", T_DIM);
     } else if (y == 17) {
         lput(0, "<>:CHANGE  B:BACK", T_DIM);
     }
@@ -526,7 +544,11 @@ static void handle_setup(uint8_t k) {
     if (k & (J_LEFT | J_RIGHT)) {
         int8_t d = (k & J_LEFT) ? -1 : 1;
         uint8_t v;
-        if (scur == 0) {
+        if (scur == SI_VEL) {
+            vel_curve = (vel_curve + 4 + d) & 3;
+        } else if (scur == SI_SCREEN || scur == SI_MON) {
+            /* A activates */
+        } else if (scur == 0) {
             uint8_t b = setup_base();
             int8_t nb = (b == 0xFF) ? 0 : (int8_t)b + d;
             if (nb < 0) nb = 0;
@@ -542,11 +564,75 @@ static void handle_setup(uint8_t k) {
         setup_changed = 1;
         for (v = 0; v < SETUP_ITEMS; v++) dirty[2 + v] = 1;
     }
+    if (k & J_A) {
+        if (scur == SI_SCREEN) {
+            lcd_off = 1;
+            DISPLAY_OFF;
+        } else if (scur == SI_MON) {
+            mon_shown = mon_count - 1;
+            go(SCR_MON);
+        }
+    }
     if (k & J_B) {
         if (setup_changed) setup_save();
         setup_changed = 0;
         go(SCR_HOME);
     }
+}
+
+/* ------------------------------------------------------------------ MIDI monitor */
+static void lhex(uint8_t x, uint8_t b) {
+    static const char hx[] = "0123456789ABCDEF";
+    line[x] = (uint8_t)(hx[b >> 4] - 32);
+    line[x + 1] = (uint8_t)(hx[b & 15] - 32);
+}
+
+static void draw_mon_row(uint8_t y) {
+    lclear();
+    if (y == 0) {
+        draw_header("MIDI MONITOR");
+    } else if (y == 1) {
+        lput(0, "CH MSG  DATA     VOX", T_DIM);
+    } else if (y >= 2 && y < 2 + MON_LINES) {
+        uint8_t age = y - 2;
+        if (age < mon_count) {
+            uint8_t *m = mon_msg[(mon_head + MON_LINES - age) % MON_LINES];
+            uint8_t st = m[0], ch = st & 15, v, base = age ? 0 : T_INV;
+            if (!age) {
+                uint8_t i;
+                for (i = 0; i < 20; i++) line[i] = T_INVBLANK;
+            }
+            lnum(ch < 9 ? 1 : 0, ch + 1, base);
+            switch (st & 0xF0) {
+            case 0x90:
+                lput(3, m[2] ? "ON" : "OFF", base);
+                lnote(8, m[1], base);
+                if (m[2]) lnum(13, m[2], base);
+                break;
+            case 0x80: lput(3, "OFF", base); lnote(8, m[1], base); break;
+            case 0xB0: lput(3, "CC", base); lnum(8, m[1], base); lnum(13, m[2], base); break;
+            case 0xC0: lput(3, "PROG", base); lnum(8, m[1], base); break;
+            case 0xE0:
+                lput(3, "BEND", base);
+                lsigned(8, (int16_t)((((uint16_t)m[2] << 7) | m[1]) - 8192), base);
+                break;
+            case 0xD0: lput(3, "PRES", base); lnum(8, m[1], base); break;
+            case 0xA0: lput(3, "PAT", base); lnum(8, m[1], base); break;
+            }
+            for (v = 0; v < NUM_VOICES && midi_ch[v] != ch; v++) {}
+            lput(17, v < NUM_VOICES ? type_short[v] : "--", base);
+        }
+    } else if (y == 15) {
+        uint8_t i;
+        lput(0, "RAW", T_DIM);
+        for (i = 0; i < 5; i++) lhex(4 + i * 3, mon_raw[(mon_raw_head + 2 + i) % 6]);
+    } else if (y == 16) {
+        lput(0, "MESSAGES", T_DIM);
+        lnum(9, (int16_t)(mon_count & 0x7FFF), 0);
+    } else if (y == 17) {
+        lput(0, "--:UNMAPPED  B:BACK", T_DIM);
+    }
+    lflush(y);
 }
 
 static void draw_row(uint8_t y) {
@@ -555,6 +641,7 @@ static void draw_row(uint8_t y) {
     case SCR_EDIT: draw_edit_row(y); break;
     case SCR_PATCH: draw_patch_row(y); break;
     case SCR_SETUP: draw_setup_row(y); break;
+    case SCR_MON: draw_mon_row(y); break;
     default: draw_name_row(y); break;
     }
 }
@@ -594,6 +681,14 @@ static uint8_t read_keys(void) {
     uint8_t newp, dirs;
     keys = joypad();
     newp = keys & (uint8_t)~keys_prev;
+    /* SELECT acts on release, so it can also be a modifier (SELECT+A/B/START) */
+    if (newp & J_SELECT) sel_pending = 1;
+    if ((keys & J_SELECT) && (newp & (uint8_t)~J_SELECT)) sel_pending = 0;
+    newp &= (uint8_t)~J_SELECT;
+    if (!(keys & J_SELECT) && (keys_prev & J_SELECT) && sel_pending) {
+        newp |= J_SELECT;
+        sel_pending = 0;
+    }
     dirs = keys & (J_UP | J_DOWN | J_LEFT | J_RIGHT);
     if (dirs && dirs == (keys_prev & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) {
         if (++rep >= 18) {
@@ -628,6 +723,26 @@ static void edit_change(int8_t dir) {
     if ((uint8_t)v != patch[sel][p]) param_set(sel, p, (uint8_t)v);
 }
 
+static void paste_sound(void) {
+    uint8_t t = voice_type[sel], p, val, m;
+    if (clip_type == 0xFF) {
+        show_flash("NOTHING COPIED");
+        return;
+    }
+    for (p = 0; p < NUM_PARAMS; p++) {
+        m = param_max[t][p];
+        if (m == NA || param_max[clip_type][p] == NA) continue;
+        if (t != clip_type && (p == P_SHAPE || p == P_TIMBRE || p == P_MODE)) continue;
+        val = clip[p];
+        param_set(sel, p, val > m ? m : val);
+    }
+    memcpy(&patch[sel][PATCH_NAME_OFS], &clip[PATCH_NAME_OFS], PATCH_NAME_LEN);
+    voice_refresh(sel);
+    dirty[2 + sel * 3] = 1;
+    dirty[3 + sel * 3] = 1;
+    show_flash("PASTED");
+}
+
 static void handle_home(uint8_t k) {
     uint8_t old = sel;
     if (k & J_UP) sel = sel ? sel - 1 : NUM_VOICES - 1;
@@ -644,7 +759,13 @@ static void handle_home(uint8_t k) {
         dirty[2 + sel * 3] = 1;
         dirty[3 + sel * 3] = 1;
     }
-    if (k & J_A) go(SCR_EDIT);
+    if ((keys & J_SELECT) && (k & J_B)) {
+        memcpy(clip, patch[sel], PATCH_SIZE);
+        clip_type = voice_type[sel];
+        show_flash("COPIED");
+    } else if ((keys & J_SELECT) && (k & J_A)) {
+        paste_sound();
+    } else if (k & J_A) go(SCR_EDIT);
     else if (k & J_B) {
         audition_stop();
         go(SCR_SETUP);
@@ -756,7 +877,7 @@ void ui_init(void) BANKED {
     DISPLAY_OFF;
     BGP_REG = 0xE4;
     LCDC_REG = LCDCF_OFF | LCDCF_BG8000 | LCDCF_BG9800 | LCDCF_BGON;
-    set_bkg_data(0, UI_TILE_COUNT, ui_tiles);
+    load_ui_tiles();
     fill_bkg_rect(0, 0, 32, 32, 0);
     screen = SCR_HOME;
     prev_screen = SCR_HOME;
@@ -776,6 +897,17 @@ void ui_tick(void) BANKED {
     uint8_t k = read_keys();
     uint8_t budget, y, v;
 
+    if (lcd_off) {
+        if (midi_activity) midi_activity--;
+        ui_dirty_params = 0;
+        if (k) { /* any button wakes the screen */
+            lcd_off = 0;
+            DISPLAY_ON;
+            dirty_all();
+        }
+        return;
+    }
+
     /* START auditions the selected channel (hold to sustain) */
     if ((keys & J_SELECT) && (k & J_START)) {
         audition = 0;
@@ -791,6 +923,9 @@ void ui_tick(void) BANKED {
     case SCR_EDIT: handle_edit(k); break;
     case SCR_PATCH: handle_patch(k); break;
     case SCR_SETUP: handle_setup(k); break;
+    case SCR_MON:
+        if (k & J_B) go(SCR_SETUP);
+        break;
     default: handle_name(k); break;
     }
 
@@ -832,6 +967,12 @@ void ui_tick(void) BANKED {
         ui_dirty_params = 0;
     } else {
         ui_dirty_params = 0;
+        if (screen == SCR_MON && mon_count != mon_shown) {
+            mon_shown = mon_count;
+            for (y = 2; y < 2 + MON_LINES; y++) dirty[y] = 1;
+            dirty[15] = 1;
+            dirty[16] = 1;
+        }
     }
 
     /* redraw a few dirty rows per frame */

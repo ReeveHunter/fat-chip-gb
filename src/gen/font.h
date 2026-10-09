@@ -2,6 +2,7 @@
 #ifndef FONT_H
 #define FONT_H
 #define UI_TILE_COUNT 211
+#define FONT_BANK 8
 #define T_INV 64
 #define T_DIM 128
 #define T_METER 192

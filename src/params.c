@@ -25,19 +25,20 @@ const uint8_t param_cc[NUM_PARAMS] = {
     83, /* SPLIT note (wave) */
     84, /* SPEECH pitch (wave) */
     86, /* PHONEME (wave, sing mode) */
+    68, /* LEGATO (standard legato footswitch CC) */
 };
 
 /* 1 = CC value is used directly (clamped), 0 = CC 0..127 scaled to 0..max */
 const uint8_t param_direct[NUM_PARAMS] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
 };
 
-/*                         LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO */
+/*                         LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO LEG */
 const uint8_t param_max[4][NUM_PARAMS] = {
-    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA },
-    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1 },
-    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA },
-    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
+    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1 },
+    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1 },
+    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1 },
+    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
 };
 
 const uint8_t voice_type[NUM_VOICES] = { VT_PULSE, VT_PULSE, VT_WAVE, VT_NOISE, VT_DRUM };

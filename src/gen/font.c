@@ -1,5 +1,5 @@
 /* Generated file - do not edit. See tools/. */
-#pragma bank 1
+#pragma bank 8
 #include <stdint.h>
 #include <gbdk/platform.h>
 

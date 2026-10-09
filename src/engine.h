@@ -45,6 +45,7 @@ enum {
     P_SPLIT,
     P_SPEECH_PITCH,
     P_PHONEME,
+    P_LEGATO, /* overlapping notes glide/change pitch without retriggering */
     NUM_PARAMS
 };
 
@@ -159,6 +160,22 @@ void bank_copy16(uint8_t bank, const uint8_t *src, uint8_t *dst);
 #define CH_OFF 16
 extern uint8_t midi_ch[NUM_VOICES];
 void panic_all(void);
+void load_ui_tiles(void);
+
+/* global setup */
+#define VEL_LINEAR 0
+#define VEL_SOFT 1
+#define VEL_HARD 2
+#define VEL_FIXED 3
+extern uint8_t vel_curve;
+
+/* MIDI monitor (last messages, newest at mon_head) */
+#define MON_LINES 12
+extern uint8_t mon_msg[MON_LINES][3];
+extern uint8_t mon_head;
+extern uint16_t mon_count;
+extern uint8_t mon_raw[6];
+extern uint8_t mon_raw_head;
 
 extern volatile uint8_t vbl_flag;
 extern uint8_t ui_dirty_params; /* bitmask of voices whose params changed */

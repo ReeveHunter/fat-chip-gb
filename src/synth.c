@@ -524,8 +524,13 @@ void note_on(uint8_t v, uint8_t note, uint8_t vel) {
         return;
     }
     vo = &voice[v];
-    hold_push(vo, note);
-    start_note(v, note, vel, 1);
+    {
+        uint8_t mode = patch[v][P_MODE];
+        uint8_t legato = patch[v][P_LEGATO] && vo->nheld && vo->env_stage != ENV_IDLE &&
+                         !(v == V_WAV && (mode == WM_SPEECH || mode == WM_SING));
+        hold_push(vo, note);
+        start_note(v, note, vel, !legato);
+    }
 }
 
 void note_off(uint8_t v, uint8_t note) {
