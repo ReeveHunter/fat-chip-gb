@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.1"
+#define VERSION_STR "0.2"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -154,6 +154,12 @@ void stream_finished(void);
 void midi_poll(void);
 void bank_copy16(uint8_t bank, const uint8_t *src, uint8_t *dst);
 
+/* MIDI channel each voice listens to (0-15), CH_OFF = ignore. Several voices
+   may share a channel to layer them. */
+#define CH_OFF 16
+extern uint8_t midi_ch[NUM_VOICES];
+void panic_all(void);
+
 extern volatile uint8_t vbl_flag;
 extern uint8_t ui_dirty_params; /* bitmask of voices whose params changed */
 extern uint8_t midi_activity;
@@ -195,5 +201,7 @@ void ui_tick(void) BANKED;
 void patches_init(void) BANKED;
 void patch_load(uint8_t v, uint8_t slot) BANKED;
 void patch_save(uint8_t v, uint8_t slot) BANKED;
+void setup_load(void) BANKED;
+void setup_save(void) BANKED;
 
 #endif
