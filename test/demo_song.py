@@ -58,7 +58,7 @@ def main():
 
     # ---------------- part A (2 bars x2)
     ev = {}
-    add(ev, 0, ("pc", 2, 3))          # ACID SWP
+    add(ev, 0, ("pc", 2, 4))          # ACID SWP
     add(ev, 0, ("pc", 0, 1))          # LEAD 25
     add(ev, 0, ("pc", 1, 2))          # PLUCK
     add(ev, 0, ("pc", 3, 0))          # HAT
@@ -101,7 +101,7 @@ def main():
     # ---------------- part C: speech over the beat
     ev = {}
     add(ev, 0, ("cc", 4, 70, 0))
-    add(ev, 0, ("pc", 2, 7))          # ROBOT (speech mode)
+    add(ev, 0, ("pc", 2, 8))          # ROBOT (speech mode)
     add(ev, 0, ("cc", 2, 84, 50))
     words = [("HH", 1), ("EH", 2), ("L", 1), ("OW", 3), ("--", 1), ("G", 1), ("EY", 2), ("M", 2),
              ("B", 1), ("OY", 4)]

@@ -123,6 +123,7 @@ def main():
         gb.run(8)
 
     # ---- wave shape sweep via CC74 (timbre) changes wave RAM
+    gb.cc(2, 71, 0)  # SYNTH mode
     gb.cc(2, 70, 0)  # PULSE shape
     gb.note(2, 57, 127)
     gb.run(5)
@@ -134,11 +135,40 @@ def main():
     gb.off(2, 57)
     gb.run(5)
 
+    # ---- PULSE mode (wave as a third pulse) and TRI mode
+    gb.cc(2, 71, 20)   # mode 1 = PULSE
+    for cc, width in ((0, 4), (40, 8), (70, 16)):
+        gb.cc(2, 70, cc)
+        gb.clear_audio()
+        gb.note(2, 57, 127)
+        gb.run(15)
+        buf = gb.var("_wave_buf", 16)
+        samples = [n for b in buf for n in (b >> 4, b & 15)]
+        hi = sum(1 for x in samples if x > 8)
+        f = pitch_hz(gb.samples()[1500:, 0])
+        check(f"wave PULSE duty cc{cc}", hi == width and near(f, midi_hz(57)), f"high {hi}/32, {f:.1f} Hz")
+        gb.off(2, 57)
+        gb.run(5)
+    gb.cc(2, 71, 40)   # mode 2 = TRI
+    gb.clear_audio()
+    gb.note(2, 45, 127)
+    gb.run(15)
+    buf = gb.var("_wave_buf", 16)
+    samples = [n for b in buf for n in (b >> 4, b & 15)]
+    diffs = {abs(samples[i + 1] - samples[i]) for i in range(31)}
+    f = pitch_hz(gb.samples()[1500:, 0])
+    check("wave TRI is a triangle", diffs <= {0, 1} and max(samples) == 15 and min(samples) == 0 and near(f, midi_hz(45)),
+          f"{samples[:12]}.. {f:.1f} Hz")
+    gb.save_wav(os.path.join(OUT, "wave_tri.wav"))
+    gb.off(2, 45)
+    gb.cc(2, 71, 0)
+    gb.run(5)
+
     # ---- dual tone: MAJOR (4:5:6) -> channel plays root/4
-    gb.cc(2, 71, 30)   # mode 1 = DUAL  (30*5>>7 = 1)
+    gb.cc(2, 71, 60)   # mode 3 = DUAL  (60*7>>7 = 3)
     gb.cc(2, 70, 10 * 8 + 4)  # shape 10 = MAJOR
     gb.run(2)
-    check("wave mode = dual", gb.var("_patch", 96)[64 + 4] == 1, str(gb.var("_patch", 96)[64 + 4]))
+    check("wave mode = dual", gb.var("_patch", 96)[64 + 4] == 3, str(gb.var("_patch", 96)[64 + 4]))
     gb.clear_audio()
     gb.note(2, 64, 120)
     gb.run(25)
@@ -206,7 +236,7 @@ def main():
     gb.run(10)
 
     # ---- speech
-    gb.cc(2, 71, 90)   # mode 3 = SPEECH (90*5>>7 = 3)
+    gb.cc(2, 71, 100)  # mode 5 = SPEECH
     gb.cc(2, 84, 48)   # speech pitch C3
     gb.run(2)
     gb.clear_audio()
@@ -225,7 +255,7 @@ def main():
     gb.save_wav(os.path.join(OUT, "speech_hello_world.wav"))
 
     # sing mode: phoneme AA, melody
-    gb.cc(2, 71, 110)  # mode 4 SING
+    gb.cc(2, 71, 120)  # mode 6 SING
     gb.cc(2, 86, order.index("AA"))
     gb.clear_audio()
     for n in (48, 52, 55, 60, 55, 52, 48):
