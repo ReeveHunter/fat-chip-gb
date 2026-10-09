@@ -124,9 +124,17 @@ static void scale_wave_buf(uint8_t amp) {
     }
 }
 
+/* PULSE mode: SHAPE 0-15 in four duty zones, like CC70 on the pulse channels */
+static const uint8_t pulse_step[4] = { 3, 7, 15, 7 }; /* 12.5%, 25%, 50%, 75% (= inverted 25%) */
+#define TRI_SHAPE 14 /* MORPH: step 5 is an exact triangle */
+#define TRI_STEP 5
+
 static uint8_t wave_timbre(void) {
     uint8_t *pp = patch[V_WAV];
-    int16_t t = pp[P_TIMBRE];
+    uint8_t mode = pp[P_MODE];
+    int16_t t;
+    if (mode == WM_TRI) return TRI_STEP;
+    t = (mode == WM_PULSE) ? pulse_step[pp[P_SHAPE] >> 2] : pp[P_TIMBRE];
     if (pp[P_LFO_DEST] == LD_TIMBRE && pp[P_LFO_DEPTH])
         t += ((int16_t)voice[V_WAV].lfo_out * pp[P_LFO_DEPTH]) >> 8;
     if (t < 0) t = 0;
@@ -177,8 +185,12 @@ static void wave_load_synth(void) {
     voice_t *vo = &voice[V_WAV];
     uint8_t *pp = patch[V_WAV];
     uint8_t t = wave_timbre();
-    const uint8_t *src = (pp[P_MODE] == WM_DUAL) ? dual_waves : shape_waves;
-    src += (((uint16_t)(pp[P_SHAPE] & 15) << 4) + t) << 4;
+    uint8_t mode = pp[P_MODE];
+    uint8_t shape = pp[P_SHAPE] & 15;
+    const uint8_t *src = (mode == WM_DUAL) ? dual_waves : shape_waves;
+    if (mode == WM_PULSE) shape = 0;      /* PULSE table: width (step+1)/32 */
+    else if (mode == WM_TRI) shape = TRI_SHAPE;
+    src += (((uint16_t)shape << 4) + t) << 4;
     bank_copy16(WAVES_BANK, src, wave_buf);
     scale_wave_buf(wave_amp);
     vo->out_period = wave_period();

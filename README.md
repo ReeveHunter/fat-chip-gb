@@ -30,7 +30,7 @@ LSDJ-style allophone speech you can sing with.
 |---|---|
 | 1 | Pulse 1 (has hardware sweep) |
 | 2 | Pulse 2 |
-| 3 | Wave: Synth / Dual / Drums / Speech / Sing modes |
+| 3 | Wave: Synth / Pulse / Tri / Dual / Drums / Speech / Sing modes |
 | 4 | Noise |
 | 5 | Drum kit (sampled, plays on the wave channel) |
 
@@ -97,15 +97,15 @@ save stores it.
 | 5 | Glide time | ✓ | ✓ | ✓ | |
 | 7 | Level | ✓ | ✓ | ✓ | ✓ |
 | 10 | Pan (L / C / R) | ✓ | ✓ | ✓ | ✓ |
-| 70 | Shape | duty 12.5/25/50/75% | wave shape, or chord in Dual | width long/short | kit (808 / CHIP) |
-| 71 | Mode | | Synth · Dual · Drums · Speech · Sing | | |
+| 70 | Shape | duty 12.5/25/50/75% | wave shape · duty in Pulse · chord in Dual | width long/short | kit (808 / CHIP) |
+| 71 | Mode | | Synth · Pulse · Tri · Dual · Drums · Speech · Sing | | |
 | 72 | Release (0 = cut) | ✓ | ✓ | ✓ | |
 | 73 | Attack (0 = instant) | ✓ | ✓ | ✓ | |
 | 74 | Timbre | | morph step / chord timbre / speech speed | | pitch ±12 |
 | 75 | Decay (0 = hold) | ✓ | ✓ | ✓ | |
 | 76 | LFO rate (0.08–24 Hz) | ✓ | ✓ | ✓ | |
 | 77 | LFO wave: tri, saw↓, saw↑, square, random | ✓ | ✓ | ✓ | |
-| 78 | LFO destination | pitch / duty / pan | pitch / timbre / pan | pitch / pan | |
+| 78 | LFO destination | pitch / duty / pan | pitch / timbre (PWM in Pulse) / pan | pitch / pan | |
 | 79 | LFO delay (fade-in after note) | ✓ | ✓ | ✓ | |
 | 80 | Pitch envelope amount (±24 semitones, 64 = off) | ✓ | ✓ | ✓ | |
 | 81 | Pitch envelope time | ✓ | ✓ | ✓ | |
@@ -126,6 +126,12 @@ value directly.
   Shapes: PULSE (PWM), SAW LP, SQR LP, ACID (resonant), FOLD, ORGAN (drawbars),
   SYNC, FM 1:1, FM 1:2, VOX (vowel morph), PHASE, RING, CRUSH, NOISE, MORPH
   (sine→tri→saw→square), HARM (single harmonic).
+- **Pulse**: the wave channel becomes a third pulse ("PU3"). **Shape** (CC70)
+  picks the duty with the same ranges as the pulse channels: 12.5 / 25 / 50 /
+  75 %. Set the LFO destination to *timbre* (shown as PWM) for smooth pulse-width
+  modulation through 16 widths, which the real pulse channels can't do.
+- **Tri**: a plain 4-bit stepped triangle, the classic chiptune bass and lead
+  tone. It has no shape or timbre settings.
 - **Dual**: chord waves built from simple integer ratios. **Shape** (CC70)
   picks the interval and **Timbre** picks the tone, from sine to square. The
   note you play is the root. Intervals: octave, 12th, 2 octaves, fifth, fourth,

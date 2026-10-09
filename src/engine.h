@@ -27,7 +27,7 @@ enum {
     P_PAN,
     P_SHAPE,  /* pulse duty / wave shape or chord / noise width / drum kit */
     P_TIMBRE, /* wave morph step / dual timbre / speech speed / drum pitch */
-    P_MODE,   /* wave: SYNTH DUAL DRUMS SPEECH SING */
+    P_MODE,   /* wave: SYNTH PULSE TRI DUAL DRUMS SPEECH SING */
     P_ATTACK,
     P_DECAY,
     P_RELEASE,
@@ -55,10 +55,13 @@ enum {
 #define NA 0xFF /* parameter not used by this voice type */
 
 #define WM_SYNTH 0
-#define WM_DUAL 1
-#define WM_DRUMS 2
-#define WM_SPEECH 3
-#define WM_SING 4
+#define WM_PULSE 1  /* wave channel as a third pulse (duty from SHAPE) */
+#define WM_TRI 2    /* plain 4-bit triangle */
+#define WM_DUAL 3
+#define WM_DRUMS 4
+#define WM_SPEECH 5
+#define WM_SING 6
+#define WM_COUNT 7
 
 #define LFO_TRI 0
 #define LFO_SAWD 1

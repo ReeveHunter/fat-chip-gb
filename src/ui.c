@@ -121,7 +121,7 @@ static void dirty_all(void) {
 /* ------------------------------------------------------------------ names / labels */
 static const char *const type_short[NUM_VOICES] = { "PU1", "PU2", "WAV", "NOI", "DRM" };
 static const char *const type_long[NUM_VOICES] = { "PULSE 1", "PULSE 2", "WAVE", "NOISE", "DRUMS" };
-static const char *const mode_names[5] = { "SYNTH", "DUAL", "DRUMS", "SPEECH", "SING" };
+static const char *const mode_names[WM_COUNT] = { "SYNTH", "PULSE", "TRI", "DUAL", "DRUMS", "SPEECH", "SING" };
 static const char *const duty_names[4] = { "12.5%", "25%", "50%", "75%" };
 static const char *const pan_names[3] = { "LEFT", "CENTER", "RIGHT" };
 static const char *const lfo_names[5] = { "TRI", "SAW DN", "SAW UP", "SQUARE", "RANDOM" };
@@ -139,6 +139,7 @@ static const char *param_label(uint8_t v, uint8_t p) {
         if (t == VT_PULSE) return "DUTY";
         if (t == VT_NOISE) return "WIDTH";
         if (t == VT_DRUM) return "KIT";
+        if (mode == WM_PULSE) return "DUTY";
         return mode == WM_DUAL ? "CHORD" : "SHAPE";
     case P_TIMBRE:
         if (t == VT_DRUM) return "PITCH";
@@ -176,6 +177,7 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
         if (t == VT_PULSE) lput(x, duty_names[val & 3], base);
         else if (t == VT_NOISE) lput(x, val ? "SHORT" : "LONG", base);
         else if (t == VT_DRUM) lputn(x, &kit_names[(uint16_t)val * 6], 6, base);
+        else if (mode == WM_PULSE) lput(x, duty_names[(val >> 2) & 3], base);
         else if (mode == WM_DUAL) lputn(x, &dual_names[(uint16_t)(val & 15) * 6], 6, base);
         else lputn(x, &shape_names[(uint16_t)(val & 15) * 6], 6, base);
         return;
@@ -183,7 +185,7 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
         if (t == VT_DRUM) lsigned(x, (int16_t)val - 12, base);
         else lnum(x, val, base);
         return;
-    case P_MODE: lput(x, mode_names[val > 4 ? 0 : val], base); return;
+    case P_MODE: lput(x, mode_names[val >= WM_COUNT ? 0 : val], base); return;
     case P_DECAY:
         if (!val) { lput(x, "HOLD", base); return; }
         break;
@@ -212,7 +214,7 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
     case P_LFO_SHAPE: lput(x, lfo_names[val > 4 ? 0 : val], base); return;
     case P_LFO_DEST:
         if (t == VT_PULSE) lput(x, dest_pulse[val > 2 ? 0 : val], base);
-        else if (t == VT_WAVE) lput(x, dest_wave[val > 2 ? 0 : val], base);
+        else if (t == VT_WAVE) lput(x, (val == LD_TIMBRE && mode == WM_PULSE) ? "PWM" : dest_wave[val > 2 ? 0 : val], base);
         else lput(x, dest_noise[val & 1], base);
         return;
     case P_SPLIT:
@@ -256,7 +258,8 @@ static void build_plist(void) {
             if (sel == V_PU2 && p == P_SWEEP) continue;
             if (t == VT_WAVE) {
                 if (mode == WM_DRUMS && (p == P_SHAPE || p == P_TIMBRE || p == P_SPLIT)) continue;
-                if ((mode == WM_SPEECH || mode == WM_SING) && p == P_SHAPE) continue;
+                if ((mode == WM_SPEECH || mode == WM_SING || mode == WM_TRI) && p == P_SHAPE) continue;
+                if ((mode == WM_PULSE || mode == WM_TRI) && p == P_TIMBRE) continue;
                 if (p == P_SPEECH_PITCH && mode != WM_SPEECH) continue;
                 if (p == P_PHONEME && mode != WM_SING) continue;
             }
@@ -293,9 +296,10 @@ static void home_card_summary(uint8_t v) {
         x += 6;
     } else if (t == VT_WAVE) {
         uint8_t m = pp[P_MODE];
-        lput(x, mode_names[m > 4 ? 0 : m], T_DIM);
+        lput(x, mode_names[m >= WM_COUNT ? 0 : m], T_DIM);
         x += 7;
-        if (m == WM_SYNTH) lputn(x - 1, &shape_names[(uint16_t)(pp[P_SHAPE] & 15) * 6], 6, T_DIM);
+        if (m == WM_PULSE) lput(x - 1, duty_names[(pp[P_SHAPE] >> 2) & 3], T_DIM);
+        else if (m == WM_SYNTH) lputn(x - 1, &shape_names[(uint16_t)(pp[P_SHAPE] & 15) * 6], 6, T_DIM);
         else if (m == WM_DUAL) lputn(x - 1, &dual_names[(uint16_t)(pp[P_SHAPE] & 15) * 6], 6, T_DIM);
         else if (m == WM_SING) lputn(x - 1, &phoneme_names[(uint16_t)pp[P_PHONEME] * 2], 2, T_DIM);
         if (pp[P_SPLIT] && m != WM_DRUMS) lput(13, "S", T_DIM);
@@ -516,7 +520,12 @@ static void edit_change(int8_t dir) {
         else if (max >= 24) step = 4;
         else if (max >= 8) step = 2;
     }
-    v += dir * step;
+    if (p == P_SHAPE && voice_type[sel] == VT_WAVE && patch[sel][P_MODE] == WM_PULSE) {
+        v = (v & ~3) + dir * 4; /* four duty zones of 4 */
+        if (v > 15) v = 12;
+    } else {
+        v += dir * step;
+    }
     if (v < 0) v = 0;
     if (v > max) v = max;
     if ((uint8_t)v != patch[sel][p]) param_set(sel, p, (uint8_t)v);
