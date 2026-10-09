@@ -4,6 +4,7 @@
 #include <gb/gb.h>
 #include <gb/isr.h>
 #include "engine.h"
+#include "gen/font.h"
 
 ISR_VECTOR(VECTOR_SERIAL, sio_isr)
 ISR_VECTOR(VECTOR_TIMER, tim_isr)
@@ -18,10 +19,37 @@ static void vbl(void) {
 }
 
 uint8_t midi_ch[NUM_VOICES] = { 0, 1, 2, 3, 4 };
+uint8_t vel_curve;
+uint8_t mon_msg[MON_LINES][3];
+uint8_t mon_head;
+uint16_t mon_count;
+uint8_t mon_raw[6];
+uint8_t mon_raw_head;
+
+static uint8_t apply_curve(uint8_t v) {
+    uint16_t x;
+    switch (vel_curve) {
+    case VEL_SOFT:
+        x = 127 - v;
+        return (uint8_t)(127 - ((x * x) >> 7));
+    case VEL_HARD:
+        x = ((uint16_t)v * v) >> 7;
+        return x ? (uint8_t)x : 1;
+    case VEL_FIXED:
+        return 127;
+    }
+    return v;
+}
 
 static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
     uint8_t ch = st & 0x0F;
     uint8_t v;
+    mon_head = (mon_head + 1) % MON_LINES;
+    mon_msg[mon_head][0] = st;
+    mon_msg[mon_head][1] = d0;
+    mon_msg[mon_head][2] = d1;
+    mon_count++;
+    if ((st & 0xF0) == 0x90 && d1) d1 = apply_curve(d1);
     for (v = 0; v < NUM_VOICES; v++) {
         if (midi_ch[v] != ch) continue;
         midi_activity = 8;
@@ -73,13 +101,28 @@ static void midi_byte(uint8_t b) {
 
 void midi_poll(void) {
     while (rx_tail != rx_head) {
+        uint8_t b;
         rx_tail++;
-        midi_byte(RX_BUF[rx_tail]);
+        b = RX_BUF[rx_tail];
+        mon_raw_head = (mon_raw_head + 1) % 6;
+        mon_raw[mon_raw_head] = b;
+        midi_byte(b);
     }
     if (st_done) {
         st_done = 0;
         stream_finished();
     }
+}
+
+static uint8_t div_last;
+static uint16_t div_acc;
+
+extern const uint8_t ui_tiles[];
+void load_ui_tiles(void) {
+    uint8_t save = _current_bank;
+    SWITCH_ROM(FONT_BANK);
+    set_bkg_data(0, UI_TILE_COUNT, ui_tiles);
+    SWITCH_ROM(save);
 }
 
 void main(void) {
@@ -97,9 +140,25 @@ void main(void) {
     enable_interrupts();
 
     while (1) {
+        uint8_t tick = 0;
         midi_poll();
-        if (vbl_flag) {
-            vbl_flag = 0;
+        if (LCDC_REG & LCDCF_ON) {
+            div_last = DIV_REG;
+            if (vbl_flag) {
+                vbl_flag = 0;
+                tick = 1;
+            }
+        } else {
+            /* screen off: no VBlank interrupt, so pace ticks from DIV (16384 Hz) */
+            uint8_t d = DIV_REG;
+            div_acc += (uint8_t)(d - div_last);
+            div_last = d;
+            if (div_acc >= 274) {
+                div_acc -= 274;
+                tick = 1;
+            }
+        }
+        if (tick) {
             synth_tick();
             midi_poll();
             ui_tick();

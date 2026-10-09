@@ -42,12 +42,23 @@ usual LSDJ trade-off.
 > Tip: don't send MIDI clock to the Arduinoboy port. The Arduinoboy drops the
 > byte after a real-time message, which can lose note velocities.
 
-## MIDI channel setup
+## Setup screen
 
-Press **B** on the home screen. Each voice can listen on any MIDI channel 1–16,
+Press **B** on the home screen. Changes are saved to the cart when you leave
+the screen.
+
+- **Channels:** each voice can listen on any MIDI channel 1–16,
 or be set to **OFF**. **SHIFT ALL** moves the whole block of five at once
-(1–5, 2–6, … 12–16). The map is saved to the cart when you leave the screen.
-The home screen shows each voice's channel number.
+(1–5, 2–6, … 12–16). The home screen shows each voice's channel number.
+- **Velocity:** LINEAR, SOFT (low velocities play louder), HARD (you have to
+  dig in), or FIXED (every note at full level).
+- **Screen off:** press A to switch the LCD off, which removes the faint LCD
+  buzz on a DMG and saves battery. The synth keeps running normally. Press any
+  button to wake the screen.
+- **MIDI monitor:** press A to see the last 12 messages as they arrive. It
+  shows channel, type, note or value, and which voice (if any) is listening,
+  plus the raw bytes and a message counter. Use it to check the Arduinoboy link
+  before blaming anything else.
 
 Two or more voices on the **same channel play together** (layering). For
 example, put Pulse 1 and Pulse 2 on one channel and detune one of them for a
@@ -73,8 +84,16 @@ the note currently playing.
 | A | edit the channel's parameters |
 | SELECT | patch browser (load / save / name) |
 | START (hold) | audition the channel without MIDI |
-| B | MIDI channel setup |
+| B | setup: MIDI channels, velocity curve, screen off, MIDI monitor |
+| SELECT + B | copy the selected channel's sound |
+| SELECT + A | paste it onto the selected channel |
 | SELECT + START | panic: every voice off, bends reset (works on any screen) |
+
+SELECT on its own acts when you *release* it, so it can double as a modifier.
+
+Copy and paste between the two pulses copies everything. Between different
+voice types (say Pulse → Wave) it copies the shared settings (envelope, glide,
+LFO, pitch envelope and so on) and keeps the target's own shape and mode.
 
 **Edit screen**: a scrolling parameter list. The bottom line shows the CC
 number for the highlighted parameter, so you can map it in Logic.
@@ -136,6 +155,11 @@ save stores it.
 | 85 | Pitch-bend range (0–24 semitones) | ✓ | ✓ | ✓ | |
 | 86 | Phoneme for Sing mode (value = index) | | ✓ | | |
 | 94 | Fine detune (±50 cents) | ✓ | ✓ | | |
+| 68 | Legato on/off (≥64 = on) | ✓ | ✓ | ✓ | |
+
+**Legato** is saved per patch. When it's on, a note played while another is
+still held changes the pitch without restarting the envelope (it glides if
+GLIDE is set), which is good for acid lines and smooth leads.
 
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
@@ -283,7 +307,7 @@ change a generator.
 | `src/ui.c` | screens, input, incremental redraw (bank 1) |
 | `src/patches.c` | SRAM patch storage, factory presets (bank 1) |
 | `tools/gen_*.py` | generate pitch tables, wave shapes, drum kits, speech frames, font |
-| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`) |
+| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`, `test_live.py`) |
 
 ### Testing in an emulator
 
