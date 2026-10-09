@@ -522,7 +522,7 @@ static void draw_setup_row(uint8_t y) {
     } else if (y == 12) {
         lput(1, "SAME CH = LAYERED", T_DIM);
     } else if (y == 14) {
-        lput(1, "ARDUINOBOY: USE 1-5", T_DIM);
+        lput(1, "ARDUINOBOY:KEEP 1-5", T_DIM);
     } else if (y == 15) {
         lput(1, "AND SET THE SHIFT", T_DIM);
     } else if (y == 16) {
