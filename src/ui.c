@@ -26,6 +26,8 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED;
 #define SCR_EDIT 1
 #define SCR_PATCH 2
 #define SCR_NAME 3
+#define SCR_SETUP 4
+#define SETUP_ITEMS 6 /* BASE + 5 voice channels */
 
 #define ROWS 18
 #define EDIT_FIRST 2
@@ -49,6 +51,8 @@ static uint8_t flash;          /* frames to show a message on the help row */
 static const char *flash_msg;
 
 static uint8_t keys, keys_prev, rep;
+static uint8_t scur, setup_changed;
+static void go(uint8_t s);
 static uint8_t audition;       /* note being auditioned + 1 */
 
 /* ------------------------------------------------------------------ text helpers */
@@ -329,9 +333,10 @@ static void draw_home_row(uint8_t y) {
             uint8_t i;
             if (v == sel) for (i = 0; i < 15; i++) line[i] = T_INVBLANK;
             line[0] = (v == sel) ? (uint8_t)('>' - 32 + T_INV) : 0;
-            lnum(1, v + 1, base);
-            lput(3, type_short[v], base);
-            lputn(7, &patch[v][PATCH_NAME_OFS], PATCH_NAME_LEN, base);
+            if (midi_ch[v] == CH_OFF) lput(1, "--", base);
+            else lnum(midi_ch[v] < 9 ? 2 : 1, midi_ch[v] + 1, base);
+            lput(4, type_short[v], base);
+            lputn(8, &patch[v][PATCH_NAME_OFS], PATCH_NAME_LEN, base);
             meter_tiles(16, voice[v].meter);
             meter_shown[v] = voice[v].meter;
         } else if (r == 1) {
@@ -339,7 +344,7 @@ static void draw_home_row(uint8_t y) {
         }
     } else if (y == 17) {
         if (flash) lput(1, flash_msg, 0);
-        else lput(0, "A:EDIT SEL:PATCH <>", T_DIM);
+        else lput(0, "A:EDIT SEL:PAT B:CH", T_DIM);
     }
     lflush(y);
 }
@@ -453,11 +458,103 @@ static void draw_name_row(uint8_t y) {
     lflush(y);
 }
 
+/* ------------------------------------------------------------------ setup (MIDI channels) */
+static uint8_t setup_base(void) {
+    /* returns base channel (0-11) if voices are on consecutive channels, else 0xFF */
+    uint8_t v;
+    if (midi_ch[0] > 11) return 0xFF;
+    for (v = 1; v < NUM_VOICES; v++)
+        if (midi_ch[v] != midi_ch[0] + v) return 0xFF;
+    return midi_ch[0];
+}
+
+static void draw_setup_row(uint8_t y) {
+    lclear();
+    if (y == 0) {
+        draw_header("MIDI CHANNELS");
+        lput(15, "V" VERSION_STR, T_INV);
+    } else if (y >= 2 && y < 2 + SETUP_ITEMS) {
+        uint8_t i = y - 2;
+        uint8_t on = (i == scur);
+        if (on) {
+            uint8_t k;
+            for (k = 0; k < 11; k++) line[k] = T_INVBLANK;
+            line[0] = (uint8_t)('>' - 32 + T_INV);
+        }
+        if (i == 0) {
+            uint8_t b = setup_base();
+            lput(1, "SHIFT ALL", on ? T_INV : T_DIM);
+            if (b == 0xFF) lput(12, "CUSTOM", 0);
+            else {
+                uint8_t x = lnum(12, b + 1, 0);
+                lput(x, "-", 0);
+                lnum(x + 1, b + 5, 0);
+            }
+        } else {
+            uint8_t v = i - 1;
+            lput(1, type_long[v], on ? T_INV : T_DIM);
+            if (midi_ch[v] == CH_OFF) lput(12, "OFF", 0);
+            else {
+                lput(12, "CH", 0);
+                lnum(15, midi_ch[v] + 1, 0);
+            }
+        }
+    } else if (y == 10) {
+        lput(1, "SAME CH = LAYERED", T_DIM);
+    } else if (y == 12) {
+        lput(1, "ARDUINOBOY USERS:", T_DIM);
+    } else if (y == 13) {
+        lput(1, "KEEP 1-5 HERE, SET", T_DIM);
+    } else if (y == 14) {
+        lput(1, "THE SHIFT IN THE", T_DIM);
+    } else if (y == 15) {
+        lput(1, "ARDUINOBOY ITSELF", T_DIM);
+    } else if (y == 17) {
+        lput(0, "<>:CHANGE  B:BACK", T_DIM);
+    }
+    lflush(y);
+}
+
+static void handle_setup(uint8_t k) {
+    uint8_t old = scur;
+    if (k & J_UP && scur) scur--;
+    if (k & J_DOWN && scur + 1 < SETUP_ITEMS) scur++;
+    if (old != scur) {
+        dirty[2 + old] = 1;
+        dirty[2 + scur] = 1;
+    }
+    if (k & (J_LEFT | J_RIGHT)) {
+        int8_t d = (k & J_LEFT) ? -1 : 1;
+        uint8_t v;
+        if (scur == 0) {
+            uint8_t b = setup_base();
+            int8_t nb = (b == 0xFF) ? 0 : (int8_t)b + d;
+            if (nb < 0) nb = 0;
+            if (nb > 11) nb = 11;
+            panic_all();
+            for (v = 0; v < NUM_VOICES; v++) midi_ch[v] = (uint8_t)nb + v;
+        } else {
+            v = scur - 1;
+            /* cycle 1..16, OFF */
+            panic_all();
+            midi_ch[v] = (uint8_t)((midi_ch[v] + CH_OFF + 1 + d) % (CH_OFF + 1));
+        }
+        setup_changed = 1;
+        for (v = 0; v < SETUP_ITEMS; v++) dirty[2 + v] = 1;
+    }
+    if (k & J_B) {
+        if (setup_changed) setup_save();
+        setup_changed = 0;
+        go(SCR_HOME);
+    }
+}
+
 static void draw_row(uint8_t y) {
     switch (screen) {
     case SCR_HOME: draw_home_row(y); break;
     case SCR_EDIT: draw_edit_row(y); break;
     case SCR_PATCH: draw_patch_row(y); break;
+    case SCR_SETUP: draw_setup_row(y); break;
     default: draw_name_row(y); break;
     }
 }
@@ -548,6 +645,10 @@ static void handle_home(uint8_t k) {
         dirty[3 + sel * 3] = 1;
     }
     if (k & J_A) go(SCR_EDIT);
+    else if (k & J_B) {
+        audition_stop();
+        go(SCR_SETUP);
+    }
     else if (k & J_SELECT) {
         pcur = patch_slot[sel];
         go(SCR_PATCH);
@@ -676,6 +777,12 @@ void ui_tick(void) BANKED {
     uint8_t budget, y, v;
 
     /* START auditions the selected channel (hold to sustain) */
+    if ((keys & J_SELECT) && (k & J_START)) {
+        audition = 0;
+        panic_all();
+        show_flash("PANIC: ALL OFF");
+        k = 0;
+    }
     if ((k & J_START) && screen != SCR_NAME) audition_start();
     if (audition && !(keys & J_START)) audition_stop();
 
@@ -683,6 +790,7 @@ void ui_tick(void) BANKED {
     case SCR_HOME: handle_home(k); break;
     case SCR_EDIT: handle_edit(k); break;
     case SCR_PATCH: handle_patch(k); break;
+    case SCR_SETUP: handle_setup(k); break;
     default: handle_name(k); break;
     }
 

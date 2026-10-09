@@ -120,6 +120,29 @@ void patch_save(uint8_t v, uint8_t slot) BANKED {
     patch_slot[v] = slot & 15;
 }
 
+/* global setup (MIDI channel map) */
+#define SETUP_ADDR ((uint8_t *)0xA900)
+static const uint8_t setup_magic[4] = { 'S', 'E', 'T', 1 };
+
+void setup_load(void) BANKED {
+    uint8_t v, c;
+    ENABLE_RAM;
+    if (!memcmp(SETUP_ADDR, setup_magic, 4)) {
+        for (v = 0; v < NUM_VOICES; v++) {
+            c = SETUP_ADDR[4 + v];
+            midi_ch[v] = (c > CH_OFF) ? v : c;
+        }
+    }
+    DISABLE_RAM;
+}
+
+void setup_save(void) BANKED {
+    ENABLE_RAM;
+    memcpy(SETUP_ADDR, setup_magic, 4);
+    memcpy(SETUP_ADDR + 4, midi_ch, NUM_VOICES);
+    DISABLE_RAM;
+}
+
 /* name of a stored slot, for the patch browser */
 void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED {
     uint8_t i, c;

@@ -17,17 +17,31 @@ static void vbl(void) {
     vbl_flag = 1;
 }
 
+uint8_t midi_ch[NUM_VOICES] = { 0, 1, 2, 3, 4 };
+
 static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
     uint8_t ch = st & 0x0F;
-    if (ch >= NUM_VOICES) return;
-    midi_activity = 8;
-    switch (st & 0xF0) {
-    case 0x90: note_on(ch, d0, d1); break;
-    case 0x80: note_off(ch, d0); break;
-    case 0xB0: control_change(ch, d0, d1); break;
-    case 0xE0: pitch_bend(ch, ((uint16_t)d1 << 7) | d0); break;
-    case 0xC0: patch_load(ch, d0 & 15); break;
-    default: break;
+    uint8_t v;
+    for (v = 0; v < NUM_VOICES; v++) {
+        if (midi_ch[v] != ch) continue;
+        midi_activity = 8;
+        switch (st & 0xF0) {
+        case 0x90: note_on(v, d0, d1); break;
+        case 0x80: note_off(v, d0); break;
+        case 0xB0: control_change(v, d0, d1); break;
+        case 0xE0: pitch_bend(v, ((uint16_t)d1 << 7) | d0); break;
+        case 0xC0: patch_load(v, d0 & 15); break;
+        default: break;
+        }
+    }
+}
+
+void panic_all(void) {
+    uint8_t v;
+    for (v = 0; v < NUM_VOICES; v++) {
+        all_notes_off(v);
+        voice[v].bend_raw = 8192;
+        voice[v].bend = 0;
     }
 }
 
@@ -74,6 +88,7 @@ void main(void) {
     rx_tail = 0;
     synth_init();
     patches_init();
+    setup_load();
     ui_init();
 
     add_VBL(vbl);

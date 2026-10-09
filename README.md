@@ -42,6 +42,25 @@ usual LSDJ trade-off.
 > Tip: don't send MIDI clock to the Arduinoboy port. The Arduinoboy drops the
 > byte after a real-time message, which can lose note velocities.
 
+## MIDI channel setup
+
+Press **B** on the home screen. Each voice can listen on any MIDI channel 1–16,
+or be set to **OFF**. **SHIFT ALL** moves the whole block of five at once
+(1–5, 2–6, … 12–16). The map is saved to the cart when you leave the screen.
+The home screen shows each voice's channel number.
+
+Two or more voices on the **same channel play together** (layering). For
+example, put Pulse 1 and Pulse 2 on one channel and detune one of them for a
+fat unison lead, or stack Pulse + Tri for a thick bass.
+
+> **With an Arduinoboy, leave these at 1–5.** The Arduinoboy's mGB mode
+> doesn't pass MIDI channels through. It picks the five channels set in its own
+> configuration and always renumbers them 1–5 before they reach the Game Boy.
+> To move the Game Boy to, say, MIDI 6–10, change the mGB channels in the
+> Arduinoboy (Arduinoboy Editor or its config SysEx). The in-ROM map is for
+> adapters that pass channels straight through, and for layering or
+> switching voices off.
+
 ## Controls on the Game Boy
 
 **Home screen**: one card per channel, with patch name, live level meter, and
@@ -54,6 +73,8 @@ the note currently playing.
 | A | edit the channel's parameters |
 | SELECT | patch browser (load / save / name) |
 | START (hold) | audition the channel without MIDI |
+| B | MIDI channel setup |
+| SELECT + START | panic: every voice off, bends reset (works on any screen) |
 
 **Edit screen**: a scrolling parameter list. The bottom line shows the CC
 number for the highlighted parameter, so you can map it in Logic.
@@ -262,7 +283,7 @@ change a generator.
 | `src/ui.c` | screens, input, incremental redraw (bank 1) |
 | `src/patches.c` | SRAM patch storage, factory presets (bank 1) |
 | `tools/gen_*.py` | generate pitch tables, wave shapes, drum kits, speech frames, font |
-| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt |
+| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`) |
 
 ### Testing in an emulator
 
