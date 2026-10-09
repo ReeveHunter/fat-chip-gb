@@ -1,0 +1,8 @@
+build/
+*.ihx
+*.map
+*.noi
+*.sav
+*.ram
+test/out/
+__pycache__/
