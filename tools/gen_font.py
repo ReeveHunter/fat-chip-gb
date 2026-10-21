@@ -93,15 +93,23 @@ GLYPHS = {
 }
 
 
+STYLE = os.environ.get("FONT_STYLE", "bold")
+
+
+def shape(g):
+    return thin(g) if STYLE == "thin" else g
+
+
 def main():
     font = load_font()
+    dim = 3 if STYLE == "bold-dark" else 2
     tiles = []
     for code in range(32, 96):
-        tiles += tile_from_rows(glyph_pix(thin(font[code]), 3, 0))
+        tiles += tile_from_rows(glyph_pix(shape(font[code]), 3, 0))
     for code in range(32, 96):
-        tiles += tile_from_rows(glyph_pix(thin(font[code]), 0, 3))
+        tiles += tile_from_rows(glyph_pix(shape(font[code]), 0, 3))
     for code in range(32, 96):
-        tiles += tile_from_rows(glyph_pix(thin(font[code]), 2, 0))
+        tiles += tile_from_rows(glyph_pix(shape(font[code]), dim, 0))
     for k in range(9):
         pix = []
         for r in range(8):
