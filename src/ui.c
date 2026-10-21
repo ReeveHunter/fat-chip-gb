@@ -27,10 +27,12 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED;
 #define SCR_NAME 3
 #define SCR_SETUP 4
 #define SCR_MON 5
-#define SETUP_ITEMS 9 /* SHIFT ALL, 5 voice channels, VELOCITY, SCREEN OFF, MONITOR */
+#define SCR_LINK 6
+#define SETUP_ITEMS 10 /* SHIFT ALL, 5 voice channels, VELOCITY, SCREEN OFF, MONITOR, LINK TEST */
 #define SI_VEL 6
 #define SI_SCREEN 7
 #define SI_MON 8
+#define SI_LINK 9
 
 #define ROWS 18
 #define EDIT_FIRST 2
@@ -57,6 +59,7 @@ static uint8_t keys, keys_prev, rep;
 static uint8_t scur, setup_changed;
 static uint8_t sel_pending, lcd_off;
 static uint16_t mon_shown;
+static uint16_t link_shown;
 static uint8_t clip[PATCH_SIZE];
 static uint8_t clip_type = 0xFF;
 static void go(uint8_t s);
@@ -509,6 +512,9 @@ static void draw_setup_row(uint8_t y) {
         } else if (i == SI_MON) {
             lput(1, "MIDI MONITOR", on ? T_INV : T_DIM);
             lput(14, "A:GO", 0);
+        } else if (i == SI_LINK) {
+            lput(1, "LINK TEST", on ? T_INV : T_DIM);
+            lput(14, "A:GO", 0);
         } else {
             uint8_t v = i - 1;
             lput(1, type_long[v], on ? T_INV : T_DIM);
@@ -521,9 +527,9 @@ static void draw_setup_row(uint8_t y) {
     } else if (y == 12) {
         lput(1, "SAME CH = LAYERED", T_DIM);
     } else if (y == 14) {
-        lput(1, "ARDUINOBOY:KEEP 1-5", T_DIM);
+        lput(1, "STOCK ARDUINOBOY:", T_DIM);
     } else if (y == 15) {
-        lput(1, "AND SET THE SHIFT", T_DIM);
+        lput(1, "KEEP 1-5, SHIFT", T_DIM);
     } else if (y == 16) {
         lput(1, "IN THE ARDUINOBOY", T_DIM);
     } else if (y == 17) {
@@ -545,7 +551,7 @@ static void handle_setup(uint8_t k) {
         uint8_t v;
         if (scur == SI_VEL) {
             vel_curve = (vel_curve + 4 + d) & 3;
-        } else if (scur == SI_SCREEN || scur == SI_MON) {
+        } else if (scur == SI_SCREEN || scur == SI_MON || scur == SI_LINK) {
             /* A activates */
         } else if (scur == 0) {
             uint8_t b = setup_base();
@@ -570,6 +576,9 @@ static void handle_setup(uint8_t k) {
         } else if (scur == SI_MON) {
             mon_shown = mon_count - 1;
             go(SCR_MON);
+        } else if (scur == SI_LINK) {
+            link_shown = lt_bytes - 1;
+            go(SCR_LINK);
         }
     }
     if (k & J_B) {
@@ -634,6 +643,46 @@ static void draw_mon_row(uint8_t y) {
     lflush(y);
 }
 
+/* ------------------------------------------------------------------ link test */
+/* Counts what arrives over the link. Pair with the Fat Chip link test page,
+   which sends known bursts and shows the numbers this screen should reach. */
+static void lcount(uint8_t x, uint16_t n) {
+    lnum(x, (int16_t)(n & 0x7FFF), 0);
+}
+
+static void draw_link_row(uint8_t y) {
+    lclear();
+    switch (y) {
+    case 0: draw_header("LINK TEST"); break;
+    case 2: lput(0, "BYTES", T_DIM); lcount(11, lt_bytes); break;
+    case 3: lput(0, "NOTE ONS", T_DIM); lcount(11, lt_noteon); break;
+    case 4: lput(0, "CCS", T_DIM); lcount(11, lt_cc); break;
+    case 5: lput(0, "BENDS", T_DIM); lcount(11, lt_bend); break;
+    case 6: lput(0, "NO STATUS", T_DIM); lcount(11, lt_stray); break;
+    case 8: lput(0, "CLOCK F8", T_DIM); lcount(11, lt_clock); break;
+    case 9:
+        lput(0, "START", T_DIM); lcount(6, lt_start);
+        lput(10, "STOP", T_DIM); lcount(15, lt_stop);
+        break;
+    case 10:
+        lput(0, "CONT", T_DIM); lcount(6, lt_cont);
+        lput(10, "SENSE", T_DIM); lcount(16, lt_sense);
+        break;
+    case 12:
+        lput(0, "SYSEX F0", T_DIM); lcount(9, lt_sx_start);
+        lput(13, "F7", T_DIM); lcount(16, lt_sx_end);
+        break;
+    case 13:
+        lput(0, "LAST LEN", T_DIM); lcount(9, lt_sx_len);
+        lput(14, "SUM", T_DIM); lhex(18, lt_sx_sum);
+        break;
+    case 15: lput(0, "REEVEHUNTER.COM/", T_DIM); break;
+    case 16: lput(0, "FATCHIP/LINKTEST", T_DIM); break;
+    case 17: lput(0, "A:RESET  B:BACK", T_DIM); break;
+    }
+    lflush(y);
+}
+
 static void draw_row(uint8_t y) {
     switch (screen) {
     case SCR_HOME: draw_home_row(y); break;
@@ -641,6 +690,7 @@ static void draw_row(uint8_t y) {
     case SCR_PATCH: draw_patch_row(y); break;
     case SCR_SETUP: draw_setup_row(y); break;
     case SCR_MON: draw_mon_row(y); break;
+    case SCR_LINK: draw_link_row(y); break;
     default: draw_name_row(y); break;
     }
 }
@@ -925,6 +975,14 @@ void ui_tick(void) BANKED {
     case SCR_MON:
         if (k & J_B) go(SCR_SETUP);
         break;
+    case SCR_LINK:
+        if (k & J_A) {
+            __critical { link_test_reset(); }
+            link_shown = 0xFFFF;
+            dirty_all();
+        }
+        if (k & J_B) go(SCR_SETUP);
+        break;
     default: handle_name(k); break;
     }
 
@@ -966,6 +1024,10 @@ void ui_tick(void) BANKED {
         ui_dirty_params = 0;
     } else {
         ui_dirty_params = 0;
+        if (screen == SCR_LINK && lt_bytes != link_shown) {
+            link_shown = lt_bytes;
+            for (y = 2; y <= 13; y++) dirty[y] = 1;
+        }
         if (screen == SCR_MON && mon_count != mon_shown) {
             mon_shown = mon_count;
             for (y = 2; y < 2 + MON_LINES; y++) dirty[y] = 1;

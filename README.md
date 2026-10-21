@@ -63,6 +63,16 @@ or be set to **OFF**. **SHIFT ALL** moves the whole block of five at once
   plus the raw bytes and a message counter. Use it to check the Arduinoboy link
   before blaming anything else.
 
+- **Link test:** press A to see counters for everything that arrives over the
+  link: bytes, note-ons, CCs, bends, data bytes that arrived with no status
+  (a sign something was dropped), MIDI clock / start / stop / continue / active
+  sensing, and SysEx (starts, ends, and the last message's length and
+  checksum). A resets the counters. Pair it with the link test page at
+  [reevehunter.com/fatchip/linktest](https://reevehunter.com/fatchip/linktest/),
+  which sends known bursts and shows the numbers this screen should reach. It
+  answers "does SysEx get through my adapter?" and "does MIDI clock make it
+  drop bytes?".
+
 Two or more voices on the **same channel play together** (layering). For
 example, put Pulse 1 and Pulse 2 on one channel and detune one of them for a
 fat unison lead, or stack Pulse + Tri for a thick bass.
@@ -86,7 +96,7 @@ the note currently playing.
 | A | edit the channel's parameters |
 | SELECT | patch browser (load / save / name) |
 | START (hold) | audition the channel without MIDI |
-| B | setup: MIDI channels, velocity curve, screen off, MIDI monitor |
+| B | setup: MIDI channels, velocity curve, screen off, MIDI monitor, link test |
 | SELECT + B | copy the selected channel's sound |
 | SELECT + A | paste it onto the selected channel |
 | SELECT + START | panic: every voice off, bends reset (works on any screen) |
@@ -286,6 +296,10 @@ Example: "hello" = HH EH L OW = D#4, D2, G3, C#3 (notes 63, 38, 55, 49).
   the sound currently is.
 - Everything is written to finish quickly so the serial interrupt is never
   held off long. The Arduinoboy sends a byte every 500 µs.
+- The receive path avoids `%` (a slow software divide on the Game Boy's CPU).
+  With it, v0.2 could only handle about 20 bytes per frame, below the
+  Arduinoboy's ~33, so long SysEx or dense bends could overflow the buffer.
+  `test_link.py` checks every byte gets through at twice the link rate.
 
 ## Building
 
@@ -309,7 +323,7 @@ change a generator.
 | `src/ui.c` | screens, input, incremental redraw (bank 1) |
 | `src/patches.c` | SRAM patch storage, factory presets (bank 1) |
 | `tools/gen_*.py` | generate pitch tables, wave shapes, drum kits, speech frames, font |
-| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`, `test_live.py`) |
+| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`, `test_live.py`, `test_link.py`) |
 
 ### Testing in an emulator
 

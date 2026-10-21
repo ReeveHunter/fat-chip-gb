@@ -177,6 +177,14 @@ extern uint16_t mon_count;
 extern uint8_t mon_raw[6];
 extern uint8_t mon_raw_head;
 
+/* Link test (Setup > LINK TEST): counts what actually arrives over the link,
+   so we can check whether SysEx, clock etc. get through the MIDI adapter. */
+extern uint16_t lt_bytes, lt_noteon, lt_cc, lt_bend, lt_clock, lt_stray;
+extern uint8_t lt_start, lt_cont, lt_stop, lt_sense;
+extern uint8_t lt_sx_start, lt_sx_end, lt_sx_sum;
+extern uint16_t lt_sx_len;
+void link_test_reset(void);
+
 extern volatile uint8_t vbl_flag;
 extern uint8_t ui_dirty_params; /* bitmask of voices whose params changed */
 extern uint8_t midi_activity;
