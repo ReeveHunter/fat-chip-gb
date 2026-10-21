@@ -1,4 +1,4 @@
-# gbmidi (working title)
+# Fat Chip GB
 
 A MIDI sound module for the original Game Boy (DMG), in the spirit of
 [mGB](https://github.com/trash80/mGB). Every sound channel is played live from
@@ -6,10 +6,13 @@ your DAW over an Arduinoboy, with no tracker. The wave channel has extra modes:
 a morphing wavetable synth, dual-tone/chord waves, a sampled drum kit, and
 LSDJ-style allophone speech you can sing with.
 
-*Name TBD. Rename the repo/ROM whenever.*
+Formerly **gbmidi**. Fat Chip GB is the Game Boy part of **Fat Chip**, a live rig where a
+C64 (or a DAW) plays the SID, a Game Boy and a MidiNES together as one fat chiptune
+instrument. It still works on its own as a MIDI sound module for a DAW. The Fat Chip
+plans live in `../fat-chip/fat-chip-brief.md` (section 8).
 
 ```
- GBMIDI   MIDI SYNTH ♪
+ FAT CHIP GB        ♪
 >1 PU1 LEAD 25   ▬▬▬
    25%            C4
  2 PU2 PLUCK     ▬
@@ -21,7 +24,7 @@ LSDJ-style allophone speech you can sing with.
 
 ## Quick start
 
-1. Flash `gbmidi.gb` to your cart. It's MBC1 + 8 KB battery SRAM, 256 KB.
+1. Flash `fat-chip-gb.gb` to your cart. It's MBC1 + 8 KB battery SRAM, 256 KB.
 2. Set the Arduinoboy to **mGB mode** (mode 5 / LED 5). It forwards MIDI
    channels 1–5 to the Game Boy by default.
 3. In Logic, point tracks at MIDI channels 1–5:
@@ -64,13 +67,12 @@ Two or more voices on the **same channel play together** (layering). For
 example, put Pulse 1 and Pulse 2 on one channel and detune one of them for a
 fat unison lead, or stack Pulse + Tri for a thick bass.
 
-> **With an Arduinoboy, leave these at 1–5.** The Arduinoboy's mGB mode
-> doesn't pass MIDI channels through. It picks the five channels set in its own
-> configuration and always renumbers them 1–5 before they reach the Game Boy.
-> To move the Game Boy to, say, MIDI 6–10, change the mGB channels in the
-> Arduinoboy (Arduinoboy Editor or its config SysEx). The in-ROM map is for
-> adapters that pass channels straight through, and for layering or
-> switching voices off.
+> **Which adapter?** If your MIDI adapter passes all 16 channels straight
+> through to the Game Boy (Reeve's does; his mGB build listens on 11–15), set
+> the channels here, for example SHIFT ALL to 11–15. A *stock* Arduinoboy in
+> mGB mode is different: it picks five channels in its own configuration and
+> always renumbers them 1–5 before they reach the Game Boy, so leave these at
+> 1–5 and change the channels in the Arduinoboy instead.
 
 ## Controls on the Game Boy
 
@@ -291,7 +293,7 @@ Needs [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020/releases) 4.3+ and
 Python 3 with numpy (plus Pillow for the preview images).
 
 ```sh
-make GBDK_HOME=/path/to/gbdk          # builds gbmidi.gb
+make GBDK_HOME=/path/to/gbdk          # builds fat-chip-gb.gb
 make gen                              # regenerate tables/samples/speech only
 ```
 

@@ -2,7 +2,7 @@
 Arduinoboy does, and records audio / screenshots / registers.
 
     from harness import GB
-    gb = GB("gbmidi.gb")
+    gb = GB("fat-chip-gb.gb")
     gb.midi(0x90, 60, 100); gb.run(30); gb.midi(0x80, 60, 0)
     gb.save_wav("out.wav")
 """

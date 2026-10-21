@@ -1,4 +1,4 @@
-/* gbmidi user interface (bank 1)
+/* Fat Chip GB user interface (bank 1)
  *
  * HOME   : five channel cards with live meters.  Up/Down pick a channel,
  *          Left/Right step through saved patches, A edits, SELECT = patches,
@@ -333,8 +333,7 @@ static void home_card_summary(uint8_t v) {
 static void draw_home_row(uint8_t y) {
     lclear();
     if (y == 0) {
-        draw_header("GBMIDI");
-        lput(8, "MIDI SYNTH", T_INV);
+        draw_header("FAT CHIP GB");
         line[19] = midi_activity ? T_NOTE : T_INVBLANK;
         act_shown = midi_activity ? 1 : 0;
     } else if (y >= 2 && y <= 16) {

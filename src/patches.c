@@ -8,6 +8,8 @@
 #define SLOTS_PER_TYPE 16
 #define SRAM_VERSION 2
 
+/* Magic kept from the gbmidi days on purpose: changing it would wipe the
+   patches already saved on the owner's cart. */
 static const uint8_t magic[5] = { 'G', 'B', 'M', 'I', SRAM_VERSION };
 
 /*  LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO  pad pad  name */

@@ -1,14 +1,14 @@
-# gbmidi - build with GBDK-2020 (https://github.com/gbdk-2020/gbdk-2020)
+# Fat Chip GB - build with GBDK-2020 (https://github.com/gbdk-2020/gbdk-2020)
 #   make GBDK_HOME=/path/to/gbdk
 GBDK_HOME ?= $(HOME)/gbdk
 LCC   = $(GBDK_HOME)/bin/lcc
 PY   ?= python3
 
-ROM   = gbmidi.gb
+ROM   = fat-chip-gb.gb
 BUILD = build
 
 CFLAGS  = -Isrc -Wf--opt-code-speed -Wf--max-allocs-per-node50000
-LDFLAGS = -Wl-yt0x03 -Wl-yo16 -Wl-ya1 -Wm-yn"GBMIDI"
+LDFLAGS = -Wl-yt0x03 -Wl-yo16 -Wl-ya1 -Wm-yn"FATCHIP GB"
 
 GEN = src/gen/tables.c src/gen/waves.c src/gen/names.c \
       src/gen/drums.c src/gen/drum_names.c \
@@ -45,6 +45,6 @@ $(ROM): $(OBJ)
 	$(LCC) $(LDFLAGS) -Wl-m -Wl-j -o $@ $(OBJ)
 
 clean:
-	rm -rf $(BUILD) $(ROM) gbmidi.map gbmidi.noi gbmidi.sym
+	rm -rf $(BUILD) $(ROM) fat-chip-gb.map fat-chip-gb.noi fat-chip-gb.sym
 
 .PHONY: all gen clean
