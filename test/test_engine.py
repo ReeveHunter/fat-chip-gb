@@ -9,7 +9,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 from harness import GB, pitch_hz  # noqa: E402
 
-ROM = os.path.join(os.path.dirname(__file__), "..", "gbmidi.gb")
+ROM = os.path.join(os.path.dirname(__file__), "..", "fat-chip-gb.gb")
 OUT = os.path.join(os.path.dirname(__file__), "out")
 os.makedirs(OUT, exist_ok=True)
 

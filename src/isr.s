@@ -1,4 +1,4 @@
-; gbmidi - interrupt handlers and wave RAM loader (fixed bank)
+; Fat Chip GB - interrupt handlers and wave RAM loader (fixed bank)
 ;
 ; sio_isr : one MIDI byte per serial interrupt (Arduinoboy clocks us, external clock)
 ; tim_isr : streams 32-sample chunks of drum samples into wave RAM

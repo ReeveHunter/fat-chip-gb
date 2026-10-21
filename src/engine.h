@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.2"
+#define VERSION_STR "0.3"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0

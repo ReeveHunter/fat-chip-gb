@@ -1,4 +1,4 @@
-/* gbmidi - MIDI-controlled Game Boy synth
+/* Fat Chip GB (formerly gbmidi) - MIDI-controlled Game Boy synth
  * main loop + MIDI parser (fixed bank)
  */
 #include <gb/gb.h>

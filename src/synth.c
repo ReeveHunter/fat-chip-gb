@@ -1,4 +1,4 @@
-/* gbmidi sound engine (fixed bank 0) */
+/* Fat Chip GB sound engine (fixed bank 0) */
 #include <string.h>
 #include "engine.h"
 
