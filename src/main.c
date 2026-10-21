@@ -14,6 +14,22 @@ uint8_t midi_activity;
 
 static uint8_t m_status, m_need, m_n, m_d0;
 
+/* link test counters */
+uint16_t lt_bytes, lt_noteon, lt_cc, lt_bend, lt_clock, lt_stray;
+uint8_t lt_start, lt_cont, lt_stop, lt_sense;
+uint8_t lt_sx_start, lt_sx_end, lt_sx_sum;
+uint16_t lt_sx_len;
+static uint8_t lt_in_sx, lt_sx_cursum;
+static uint16_t lt_sx_curlen;
+
+void link_test_reset(void) {
+    lt_bytes = lt_noteon = lt_cc = lt_bend = lt_clock = lt_stray = 0;
+    lt_start = lt_cont = lt_stop = lt_sense = 0;
+    lt_sx_start = lt_sx_end = lt_sx_sum = 0;
+    lt_sx_len = 0;
+    lt_in_sx = 0;
+}
+
 static void vbl(void) {
     vbl_flag = 1;
 }
@@ -44,11 +60,17 @@ static uint8_t apply_curve(uint8_t v) {
 static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
     uint8_t ch = st & 0x0F;
     uint8_t v;
-    mon_head = (mon_head + 1) % MON_LINES;
+    /* compare-and-wrap: % compiles to a slow software divide on the SM83 */
+    if (++mon_head >= MON_LINES) mon_head = 0;
     mon_msg[mon_head][0] = st;
     mon_msg[mon_head][1] = d0;
     mon_msg[mon_head][2] = d1;
     mon_count++;
+    switch (st & 0xF0) {
+    case 0x90: if (d1) lt_noteon++; break;
+    case 0xB0: lt_cc++; break;
+    case 0xE0: lt_bend++; break;
+    }
     if ((st & 0xF0) == 0x90 && d1) d1 = apply_curve(d1);
     for (v = 0; v < NUM_VOICES; v++) {
         if (midi_ch[v] != ch) continue;
@@ -75,8 +97,31 @@ void panic_all(void) {
 
 static void midi_byte(uint8_t b) {
     if (b & 0x80) {
-        if (b >= 0xF8) return;   /* realtime: ignore, keep running status */
-        if (b >= 0xF0) {         /* sysex / common: cancel running status */
+        if (b >= 0xF8) {         /* realtime: count, keep running status */
+            switch (b) {
+            case 0xF8: lt_clock++; break;
+            case 0xFA: lt_start++; break;
+            case 0xFB: lt_cont++; break;
+            case 0xFC: lt_stop++; break;
+            case 0xFE: lt_sense++; break;
+            }
+            return;
+        }
+        if (b == 0xF0) {         /* sysex start */
+            lt_sx_start++;
+            lt_in_sx = 1;
+            lt_sx_curlen = 0;
+            lt_sx_cursum = 0;
+            m_status = 0;
+            return;
+        }
+        if (b == 0xF7 && lt_in_sx) { /* sysex end: keep its length and checksum */
+            lt_sx_end++;
+            lt_sx_len = lt_sx_curlen;
+            lt_sx_sum = lt_sx_cursum;
+        }
+        lt_in_sx = 0;            /* any other status byte ends a sysex */
+        if (b >= 0xF0) {         /* system common: cancel running status */
             m_status = 0;
             return;
         }
@@ -85,7 +130,15 @@ static void midi_byte(uint8_t b) {
         m_need = ((b & 0xE0) == 0xC0) ? 1 : 2; /* Cx, Dx take one data byte */
         return;
     }
-    if (!m_status) return;
+    if (lt_in_sx) {
+        lt_sx_curlen++;
+        lt_sx_cursum += b;
+        return;
+    }
+    if (!m_status) {
+        lt_stray++;              /* data byte with no status: something was dropped */
+        return;
+    }
     if (m_n == 0) {
         m_d0 = b;
         if (m_need == 1) {
@@ -104,7 +157,8 @@ void midi_poll(void) {
         uint8_t b;
         rx_tail++;
         b = RX_BUF[rx_tail];
-        mon_raw_head = (mon_raw_head + 1) % 6;
+        lt_bytes++;
+        if (++mon_raw_head >= 6) mon_raw_head = 0;
         mon_raw[mon_raw_head] = b;
         midi_byte(b);
     }
@@ -129,6 +183,7 @@ void main(void) {
     disable_interrupts();
     rx_head = 0;
     rx_tail = 0;
+    link_test_reset();
     synth_init();
     patches_init();
     setup_load();
