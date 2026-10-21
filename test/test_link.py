@@ -42,6 +42,16 @@ def burst_notes():
     return out
 
 
+def burst_ccbend():
+    out = []
+    for i in range(32):
+        out += [0xB0 | CH, 1, i * 4]
+    for i in range(32):
+        v = 8192 + i * 64
+        out += [0xE0 | CH, v & 0x7F, (v >> 7) & 0x7F]
+    return out
+
+
 def burst_clock():
     return [0xFA] + [0xF8] * 96 + [0xFC]
 
@@ -107,6 +117,12 @@ gb.run(120)
 check("notes: 64 note-ons", u16(gb, "_lt_noteon") == 64, u16(gb, "_lt_noteon"))
 check("notes: bytes", u16(gb, "_lt_bytes") == len(b), f"{u16(gb, '_lt_bytes')} vs {len(b)}")
 check("notes: no stray data", u16(gb, "_lt_stray") == 0)
+
+# CCs and bends
+send(gb, burst_ccbend())
+gb.run(30)
+check("ccs and bends: 32 each", u16(gb, "_lt_cc") == 32 and u16(gb, "_lt_bend") == 32,
+      f"{u16(gb, '_lt_cc')} / {u16(gb, '_lt_bend')}")
 
 # clock
 send(gb, burst_clock())
