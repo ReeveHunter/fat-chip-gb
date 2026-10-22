@@ -72,7 +72,8 @@ check("velocity curves", lin == 64 and soft > 64 and hard < 64 and fixed == 127,
 gb.press("right", 2)    # back to LINEAR
 
 # ---- MIDI monitor
-gb.press("down", 2); gb.press("down", 2)   # SCREEN, MONITOR
+for _ in range(4):                          # CONTRAST, SAVE TO CART, SCREEN, MONITOR
+    gb.press("down", 2)
 gb.press("a")
 gb.cc(2, 74, 33); gb.note(9, 40, 99)
 gb.run(15)

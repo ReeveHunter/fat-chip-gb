@@ -1,4 +1,11 @@
-/* Patch storage in cartridge SRAM + factory presets (bank 1) */
+/* Patch storage + factory presets (bank 1)
+
+   Save RAM is OFF by default: patches live in work RAM (factory presets loaded
+   at every boot) and nothing is ever written to the cart. Multi-ROM flash
+   carts often share one save between all their games, so writing here could
+   damage another game's save (LSDJ keeps its working song at the start of
+   save RAM). Setup > SAVE TO CART turns it on after a warning; Fat Chip only
+   treats save RAM as its own when it finds its 10-byte marker there. */
 #pragma bank 1
 #include <string.h>
 #include "engine.h"
@@ -6,11 +13,24 @@
 #define SRAM_MAGIC_ADDR ((uint8_t *)0xA000)
 #define SRAM_SLOTS ((uint8_t *)0xA010)
 #define SLOTS_PER_TYPE 16
-#define SRAM_VERSION 2
+#define SLOT_BYTES (4 * SLOTS_PER_TYPE * PATCH_SIZE) /* 2 KB */
+#define SRAM_VERSION 3
+#define MAGIC_LEN 10
 
-/* Magic kept from the gbmidi days on purpose: changing it would wipe the
-   patches already saved on the owner's cart. */
-static const uint8_t magic[5] = { 'G', 'B', 'M', 'I', SRAM_VERSION };
+/* gbmidi's old 5-byte "GBMI" marker is deliberately not recognised: saving
+   stays off until the user turns it on. */
+static const uint8_t magic[MAGIC_LEN] = { 'F', 'A', 'T', 'C', 'H', 'I', 'P', 'G', 'B', SRAM_VERSION };
+
+uint8_t save_on;                   /* 1 = patches and setup live in save RAM */
+static uint8_t ram_slots[SLOT_BYTES]; /* patch slots when save RAM is off */
+
+static void ram_on(void) {
+    if (save_on) ENABLE_RAM;
+}
+
+static void ram_off(void) {
+    if (save_on) DISABLE_RAM;
+}
 
 /*  LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO  pad pad  name */
 #define PULSE_DEF 15, 1, 2, 0, 0, 0, 0, 2, 0, 2, 32, 24, 4, 0, 0, 14, 0, 0, 4, 0, 48, 0, 0, 0
@@ -57,7 +77,7 @@ static const uint8_t factory_drum[][PATCH_SIZE] = {
 static const uint8_t init_patch[PATCH_SIZE] = { PULSE_DEF, 'I', 'N', 'I', 'T', ' ', ' ', ' ', ' ' };
 
 static uint8_t *slot_addr(uint8_t type, uint8_t slot) {
-    return SRAM_SLOTS + (((uint16_t)type * SLOTS_PER_TYPE + (slot & 15)) << 5);
+    return (save_on ? SRAM_SLOTS : ram_slots) + (((uint16_t)type * SLOTS_PER_TYPE + (slot & 15)) << 5);
 }
 
 static void init_type(uint8_t type, const uint8_t *fac, uint8_t n) {
@@ -74,19 +94,20 @@ static void init_type(uint8_t type, const uint8_t *fac, uint8_t n) {
     }
 }
 
-static void sram_format(void) {
+static void slots_factory(void) {
     init_type(VT_PULSE, &factory_pulse[0][0], sizeof(factory_pulse) / PATCH_SIZE);
     init_type(VT_WAVE, &factory_wave[0][0], sizeof(factory_wave) / PATCH_SIZE);
     init_type(VT_NOISE, &factory_noise[0][0], sizeof(factory_noise) / PATCH_SIZE);
     init_type(VT_DRUM, &factory_drum[0][0], sizeof(factory_drum) / PATCH_SIZE);
-    memcpy(SRAM_MAGIC_ADDR, magic, 5);
 }
 
 void patches_init(void) BANKED {
     uint8_t v;
+    /* reading save RAM never changes it */
     ENABLE_RAM;
-    if (memcmp(SRAM_MAGIC_ADDR, magic, 5) != 0) sram_format();
+    save_on = (memcmp(SRAM_MAGIC_ADDR, magic, MAGIC_LEN) == 0);
     DISABLE_RAM;
+    if (!save_on) slots_factory(); /* into work RAM */
     patch_load(V_PU1, 0);
     patch_load(V_PU2, 1);
     patch_load(V_WAV, 0);
@@ -100,9 +121,9 @@ void patch_load(uint8_t v, uint8_t slot) BANKED {
     if (v >= NUM_VOICES) return;
     t = voice_type[v];
     old_mode = patch[v][P_MODE];
-    ENABLE_RAM;
+    ram_on();
     memcpy(patch[v], slot_addr(t, slot), PATCH_SIZE);
-    DISABLE_RAM;
+    ram_off();
     for (p = 0; p < NUM_PARAMS; p++) {
         uint8_t m = param_max[t][p];
         if (m != NA && patch[v][p] > m) patch[v][p] = m;
@@ -116,18 +137,19 @@ void patch_load(uint8_t v, uint8_t slot) BANKED {
 
 void patch_save(uint8_t v, uint8_t slot) BANKED {
     if (v >= NUM_VOICES) return;
-    ENABLE_RAM;
+    ram_on();
     memcpy(slot_addr(voice_type[v], slot), patch[v], PATCH_SIZE);
-    DISABLE_RAM;
+    ram_off();
     patch_slot[v] = slot & 15;
 }
 
-/* global setup (MIDI channel map) */
+/* global setup (MIDI channel map, velocity curve, contrast) */
 #define SETUP_ADDR ((uint8_t *)0xA900)
-static const uint8_t setup_magic[4] = { 'S', 'E', 'T', 1 };
+static const uint8_t setup_magic[4] = { 'S', 'E', 'T', 2 };
 
 void setup_load(void) BANKED {
     uint8_t v, c;
+    if (!save_on) return;
     ENABLE_RAM;
     if (!memcmp(SETUP_ADDR, setup_magic, 4)) {
         for (v = 0; v < NUM_VOICES; v++) {
@@ -136,25 +158,54 @@ void setup_load(void) BANKED {
         }
         c = SETUP_ADDR[4 + NUM_VOICES];
         vel_curve = (c > VEL_FIXED) ? VEL_LINEAR : c;
+        contrast = SETUP_ADDR[5 + NUM_VOICES] ? 1 : 0;
     }
     DISABLE_RAM;
 }
 
 void setup_save(void) BANKED {
+    if (!save_on) return;
     ENABLE_RAM;
     memcpy(SETUP_ADDR, setup_magic, 4);
     memcpy(SETUP_ADDR + 4, midi_ch, NUM_VOICES);
     SETUP_ADDR[4 + NUM_VOICES] = vel_curve;
+    SETUP_ADDR[5 + NUM_VOICES] = contrast;
     DISABLE_RAM;
+}
+
+/* SAVE TO CART on: copy this session's patches and setup to save RAM, then
+   write the marker last (so a power cut mid-copy leaves saving off). */
+void save_enable(void) BANKED {
+    if (save_on) return;
+    ENABLE_RAM;
+    memcpy(SRAM_SLOTS, ram_slots, SLOT_BYTES);
+    memcpy(SETUP_ADDR, setup_magic, 4);
+    memcpy(SETUP_ADDR + 4, midi_ch, NUM_VOICES);
+    SETUP_ADDR[4 + NUM_VOICES] = vel_curve;
+    SETUP_ADDR[5 + NUM_VOICES] = contrast;
+    memcpy(SRAM_MAGIC_ADDR, magic, MAGIC_LEN);
+    DISABLE_RAM;
+    save_on = 1;
+}
+
+/* SAVE TO CART off: keep the patches for this session in work RAM and clear
+   only Fat Chip's own marker, so it stays off after a reboot. */
+void save_disable(void) BANKED {
+    if (!save_on) return;
+    ENABLE_RAM;
+    memcpy(ram_slots, SRAM_SLOTS, SLOT_BYTES);
+    memset(SRAM_MAGIC_ADDR, 0, MAGIC_LEN);
+    DISABLE_RAM;
+    save_on = 0;
 }
 
 /* name of a stored slot, for the patch browser */
 void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED {
     uint8_t i, c;
-    ENABLE_RAM;
+    ram_on();
     for (i = 0; i < PATCH_NAME_LEN; i++) {
         c = slot_addr(type, slot)[PATCH_NAME_OFS + i];
         out[i] = (c < 32 || c > 95) ? ' ' : c;
     }
-    DISABLE_RAM;
+    ram_off();
 }

@@ -172,10 +172,22 @@ static uint8_t div_last;
 static uint16_t div_acc;
 
 extern const uint8_t ui_tiles[];
+extern const uint8_t ui_tiles_dimhi[];
+uint8_t contrast;
+
 void load_ui_tiles(void) {
     uint8_t save = _current_bank;
     SWITCH_ROM(FONT_BANK);
     set_bkg_data(0, UI_TILE_COUNT, ui_tiles);
+    if (contrast) set_bkg_data(T_DIM, 64, ui_tiles_dimhi);
+    SWITCH_ROM(save);
+}
+
+/* contrast switch: only the 64 label tiles change, so only reload those */
+void load_dim_tiles(void) {
+    uint8_t save = _current_bank;
+    SWITCH_ROM(FONT_BANK);
+    set_bkg_data(T_DIM, 64, contrast ? ui_tiles_dimhi : ui_tiles + T_DIM * 16);
     SWITCH_ROM(save);
 }
 

@@ -28,11 +28,15 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED;
 #define SCR_SETUP 4
 #define SCR_MON 5
 #define SCR_LINK 6
-#define SETUP_ITEMS 10 /* SHIFT ALL, 5 voice channels, VELOCITY, SCREEN OFF, MONITOR, LINK TEST */
+#define SCR_SAVEWARN 7
+/* SHIFT ALL, 5 voice channels, VELOCITY, CONTRAST, SAVE TO CART, SCREEN OFF, MONITOR, LINK TEST */
+#define SETUP_ITEMS 12
 #define SI_VEL 6
-#define SI_SCREEN 7
-#define SI_MON 8
-#define SI_LINK 9
+#define SI_CONTRAST 7
+#define SI_SAVE 8
+#define SI_SCREEN 9
+#define SI_MON 10
+#define SI_LINK 11
 
 #define ROWS 18
 #define EDIT_FIRST 2
@@ -63,6 +67,7 @@ static uint16_t link_shown;
 static uint8_t clip[PATCH_SIZE];
 static uint8_t clip_type = 0xFF;
 static void go(uint8_t s);
+static void show_flash(const char *msg);
 static uint8_t audition;       /* note being auditioned + 1 */
 
 /* ------------------------------------------------------------------ text helpers */
@@ -491,7 +496,7 @@ static void draw_setup_row(uint8_t y) {
         uint8_t on = (i == scur);
         if (on) {
             uint8_t k;
-            for (k = 0; k < 11; k++) line[k] = T_INVBLANK;
+            for (k = 0; k < 13; k++) line[k] = T_INVBLANK;
             line[0] = (uint8_t)('>' - 32 + T_INV);
         }
         if (i == 0) {
@@ -506,6 +511,12 @@ static void draw_setup_row(uint8_t y) {
         } else if (i == SI_VEL) {
             lput(1, "VELOCITY", on ? T_INV : T_DIM);
             lput(12, vel_names[vel_curve & 3], 0);
+        } else if (i == SI_CONTRAST) {
+            lput(1, "CONTRAST", on ? T_INV : T_DIM);
+            lput(12, contrast ? "HIGH" : "NORMAL", 0);
+        } else if (i == SI_SAVE) {
+            lput(1, "SAVE TO CART", on ? T_INV : T_DIM);
+            lput(14, save_on ? "ON" : "OFF", 0);
         } else if (i == SI_SCREEN) {
             lput(1, "SCREEN OFF", on ? T_INV : T_DIM);
             lput(12, "A:GO", 0);
@@ -524,18 +535,38 @@ static void draw_setup_row(uint8_t y) {
                 lnum(15, midi_ch[v] + 1, 0);
             }
         }
-    } else if (y == 12) {
-        lput(1, "SAME CH = LAYERED", T_DIM);
-    } else if (y == 14) {
-        lput(1, "STOCK ARDUINOBOY:", T_DIM);
     } else if (y == 15) {
-        lput(1, "KEEP 1-5, SHIFT", T_DIM);
-    } else if (y == 16) {
-        lput(1, "IN THE ARDUINOBOY", T_DIM);
+        lput(1, "SAME CH = LAYERED", T_DIM);
     } else if (y == 17) {
-        lput(0, "<>:CHANGE  B:BACK", T_DIM);
+        if (flash) lput(1, flash_msg, 0);
+        else lput(0, "<>:CHANGE  B:BACK", T_DIM);
     }
     lflush(y);
+}
+
+/* Move every voice's channel up or down by one, keeping the gaps of a custom
+   map and leaving OFF voices alone. Stops at the ends (no wrapping). */
+static void shift_all(int8_t d) {
+    uint8_t v, lo = 15, hi = 0, any = 0;
+    for (v = 0; v < NUM_VOICES; v++) {
+        if (midi_ch[v] == CH_OFF) continue;
+        any = 1;
+        if (midi_ch[v] < lo) lo = midi_ch[v];
+        if (midi_ch[v] > hi) hi = midi_ch[v];
+    }
+    if (!any || (d < 0 && lo == 0) || (d > 0 && hi == 15)) return;
+    panic_all();
+    for (v = 0; v < NUM_VOICES; v++)
+        if (midi_ch[v] != CH_OFF) midi_ch[v] = (uint8_t)((int8_t)midi_ch[v] + d);
+}
+
+static void toggle_save(void) {
+    if (save_on) {
+        save_disable();
+        show_flash("CART SAVING OFF");
+    } else {
+        go(SCR_SAVEWARN); /* turning it on needs a confirmation */
+    }
 }
 
 static void handle_setup(uint8_t k) {
@@ -551,15 +582,16 @@ static void handle_setup(uint8_t k) {
         uint8_t v;
         if (scur == SI_VEL) {
             vel_curve = (vel_curve + 4 + d) & 3;
+        } else if (scur == SI_CONTRAST) {
+            contrast ^= 1;
+            load_dim_tiles();
+        } else if (scur == SI_SAVE) {
+            toggle_save();
+            if (screen != SCR_SETUP) return;
         } else if (scur == SI_SCREEN || scur == SI_MON || scur == SI_LINK) {
             /* A activates */
         } else if (scur == 0) {
-            uint8_t b = setup_base();
-            int8_t nb = (b == 0xFF) ? 0 : (int8_t)b + d;
-            if (nb < 0) nb = 0;
-            if (nb > 11) nb = 11;
-            panic_all();
-            for (v = 0; v < NUM_VOICES; v++) midi_ch[v] = (uint8_t)nb + v;
+            shift_all(d);
         } else {
             v = scur - 1;
             /* cycle 1..16, OFF */
@@ -570,7 +602,16 @@ static void handle_setup(uint8_t k) {
         for (v = 0; v < SETUP_ITEMS; v++) dirty[2 + v] = 1;
     }
     if (k & J_A) {
-        if (scur == SI_SCREEN) {
+        if (scur == SI_SAVE) {
+            toggle_save();
+            if (screen != SCR_SETUP) return;
+            for (old = 0; old < SETUP_ITEMS; old++) dirty[2 + old] = 1;
+        } else if (scur == SI_CONTRAST) {
+            contrast ^= 1;
+            load_dim_tiles();
+            setup_changed = 1;
+            dirty[2 + SI_CONTRAST] = 1;
+        } else if (scur == SI_SCREEN) {
             lcd_off = 1;
             DISPLAY_OFF;
         } else if (scur == SI_MON) {
@@ -683,6 +724,26 @@ static void draw_link_row(uint8_t y) {
     lflush(y);
 }
 
+/* ------------------------------------------------------------------ save warning */
+static void draw_savewarn_row(uint8_t y) {
+    lclear();
+    switch (y) {
+    case 0: draw_header("SAVE TO CART?"); break;
+    case 2: lput(0, "FAT CHIP WILL WRITE", 0); break;
+    case 3: lput(0, "PATCHES AND SETUP", 0); break;
+    case 4: lput(0, "TO THE CART'S SAVE.", 0); break;
+    case 6: lput(0, "MULTI-ROM CARTS", 0); break;
+    case 7: lput(0, "OFTEN SHARE ONE", 0); break;
+    case 8: lput(0, "SAVE: THIS CAN", 0); break;
+    case 9: lput(0, "DAMAGE ANOTHER", 0); break;
+    case 10: lput(0, "GAME'S SAVE (LSDJ!)", 0); break;
+    case 12: lput(0, "BACK IT UP FIRST.", 0); break;
+    case 15: lput(0, "A: TURN ON", 0); break;
+    case 16: lput(0, "B: CANCEL", 0); break;
+    }
+    lflush(y);
+}
+
 static void draw_row(uint8_t y) {
     switch (screen) {
     case SCR_HOME: draw_home_row(y); break;
@@ -691,6 +752,7 @@ static void draw_row(uint8_t y) {
     case SCR_SETUP: draw_setup_row(y); break;
     case SCR_MON: draw_mon_row(y); break;
     case SCR_LINK: draw_link_row(y); break;
+    case SCR_SAVEWARN: draw_savewarn_row(y); break;
     default: draw_name_row(y); break;
     }
 }
@@ -974,6 +1036,15 @@ void ui_tick(void) BANKED {
     case SCR_SETUP: handle_setup(k); break;
     case SCR_MON:
         if (k & J_B) go(SCR_SETUP);
+        break;
+    case SCR_SAVEWARN:
+        if (k & J_A) {
+            save_enable();
+            go(SCR_SETUP);
+            show_flash("SAVING TO CART: ON");
+        } else if (k & J_B) {
+            go(SCR_SETUP);
+        }
         break;
     case SCR_LINK:
         if (k & J_A) {
