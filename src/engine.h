@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.3"
+#define VERSION_STR "0.4"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -161,6 +161,7 @@ void bank_copy16(uint8_t bank, const uint8_t *src, uint8_t *dst);
 extern uint8_t midi_ch[NUM_VOICES];
 void panic_all(void);
 void load_ui_tiles(void);
+void load_dim_tiles(void);
 
 /* global setup */
 #define VEL_LINEAR 0
@@ -228,5 +229,9 @@ void patch_load(uint8_t v, uint8_t slot) BANKED;
 void patch_save(uint8_t v, uint8_t slot) BANKED;
 void setup_load(void) BANKED;
 void setup_save(void) BANKED;
+void save_enable(void) BANKED;
+void save_disable(void) BANKED;
+extern uint8_t save_on;   /* patches/setup in cart save RAM (off by default) */
+extern uint8_t contrast;  /* 0 normal, 1 high: grey labels drawn black */
 
 #endif

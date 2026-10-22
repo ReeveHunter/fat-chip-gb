@@ -25,6 +25,8 @@ plans live in `../fat-chip/fat-chip-brief.md` (section 8).
 ## Quick start
 
 1. Flash `fat-chip-gb.gb` to your cart. It's MBC1 + 8 KB battery SRAM, 256 KB.
+   **It doesn't write to the cart's save RAM unless you turn that on** (Setup >
+   SAVE TO CART), so it's safe on multi-ROM carts that share one save with LSDJ.
 2. Set the Arduinoboy to **mGB mode** (mode 5 / LED 5). It forwards MIDI
    channels 1–5 to the Game Boy by default.
 3. In Logic, point tracks at MIDI channels 1–5:
@@ -47,12 +49,23 @@ usual LSDJ trade-off.
 
 ## Setup screen
 
-Press **B** on the home screen. Changes are saved to the cart when you leave
-the screen.
+Press **B** on the home screen. If SAVE TO CART is on, changes are saved when
+you leave the screen; otherwise they last until you switch off.
 
 - **Channels:** each voice can listen on any MIDI channel 1–16,
-or be set to **OFF**. **SHIFT ALL** moves the whole block of five at once
-(1–5, 2–6, … 12–16). The home screen shows each voice's channel number.
+or be set to **OFF**. **SHIFT ALL** moves every voice up or down one channel
+at once, keeping a custom layout's gaps and leaving OFF voices alone; it stops
+when a voice reaches 1 or 16. The home screen shows each voice's channel number.
+- **Contrast:** NORMAL draws labels in dark grey; HIGH draws them black too,
+  for screens where the grey is hard to read.
+- **Save to cart (off by default):** with it off, Fat Chip GB never writes to
+  the cart's save RAM: factory patches load at every boot, and your edits and
+  setup last until you switch off. Turning it on shows a warning first,
+  because multi-ROM flash carts often share one save between all their games
+  and writing to it can damage another game's save (LSDJ keeps its working song
+  at the start of save RAM). Back that save up first. Once on, Fat Chip writes
+  a 10-byte marker and only uses save RAM while that marker is there; turning
+  it off clears just the marker. gbmidi's old "GBMI" saves are ignored.
 - **Velocity:** LINEAR, SOFT (low velocities play louder), HARD (you have to
   dig in), or FIXED (every note at full level).
 - **Screen off:** press A to switch the LCD off, which removes the faint LCD

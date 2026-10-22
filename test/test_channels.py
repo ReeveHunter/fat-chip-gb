@@ -59,7 +59,7 @@ check("SELECT+START panic silences", (gb.mem(0xFF26) & 3) == 0, hex(gb.mem(0xFF2
 gb.pb.stop(save=True)
 gb2 = GB(ROM)
 gb2.run(200)
-check("map survives reboot (SRAM)", gb2.var("_midi_ch", 5) == [5, 5, 16, 8, 9], str(gb2.var("_midi_ch", 5)))
+check("save RAM off by default: map back to 1-5 after reboot", gb2.var("_midi_ch", 5) == [0, 1, 2, 3, 4], str(gb2.var("_midi_ch", 5)))
 gb2.stop()
 clean_ram()
 print(f"\n{fails} failure(s)")
