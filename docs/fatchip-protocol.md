@@ -1,4 +1,4 @@
-# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.5)
+# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.6)
 
 This is the contract a Fat Chip controller (Fat Chip 64, or a future web controller) uses to drive Fat Chip GB. Everything here is plain channel MIDI: tested on Reeve's rig (Teensyboy Pro, mGB mode, DMG), the link passes notes, CCs, pitch bend and program change, but **not MIDI clock and not SysEx**.
 
@@ -25,7 +25,7 @@ The link is one-way, so the controller can't ask the Game Boy anything. Send thi
 3. CC 103 master tune, CC 104/105 warble, CC 107/108 tempo, then CC 109 downbeat on the next bar line.
 4. Per voice: Program Change to pick its role patch, CC 7 level, and anything else the role needs.
 
-## 3. Global CCs (102–111)
+## 3. Global CCs (102–112)
 
 Accepted on **any channel a voice listens to**, applied once to every voice. In the DAW profile they work too (they're undefined CCs in General MIDI), and they can't be learned onto parameters.
 
@@ -41,6 +41,7 @@ Accepted on **any channel a voice listens to**, applied once to every voice. In 
 | 109 | Downbeat | Any value: "beat 1 of a bar is now". Resets the Game Boy's clock phase. Send once per bar; it corrects drift |
 | 110 | Latch | ≥ 64 = hold every voice's notes after note-off (like sustain on all voices); < 64 releases them |
 | 111 | Panic | Any value: all voices off, bends reset, latch off |
+| 112 | Display | 0 = screen on, 1 = screen off (no LCD buzz; the synth keeps running). Fat Chip 64 sends it when its own video mode changes. Values 2+ reserved (visualizer) |
 
 The Game Boy's tempo clock runs at 24 steps per beat from its frame rate (59.73 Hz on a DMG; with the screen off it paces from the DIV timer at ~59.80 Hz, 0.1% fast), so the once-per-bar downbeat matters. Nothing uses the clock yet except the beat blink in the home header; the arpeggiator and glitch will.
 
