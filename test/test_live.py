@@ -51,7 +51,7 @@ gb.off(0, 60); gb.off(0, 67)
 gb.cc(0, 68, 0); gb.cc(0, 75, 0)
 gb.run(20)
 
-# ---- velocity curves (setup screen: B, then down 6 to VELOCITY)
+# ---- velocity curves (setup screen: B, then down 7 to VELOCITY)
 def vel_after(note_vel):
     gb.note(0, 60, note_vel); gb.run(2)
     v = vfield(gb, 0, 1)
@@ -60,7 +60,7 @@ def vel_after(note_vel):
 
 lin = vel_after(64)
 gb.press("b")
-for _ in range(6):
+for _ in range(7):
     gb.press("down", 2)
 gb.press("right", 2)    # SOFT
 soft = vel_after(64)
@@ -72,7 +72,7 @@ check("velocity curves", lin == 64 and soft > 64 and hard < 64 and fixed == 127,
 gb.press("right", 2)    # back to LINEAR
 
 # ---- MIDI monitor
-for _ in range(4):                          # CONTRAST, SAVE TO CART, SCREEN, MONITOR
+for _ in range(5):                          # CONTRAST, SAVE, CC MAP, SCREEN, MONITOR
     gb.press("down", 2)
 gb.press("a")
 gb.cc(2, 74, 33); gb.note(9, 40, 99)

@@ -71,6 +71,29 @@ static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
     case 0xB0: lt_cc++; break;
     case 0xE0: lt_bend++; break;
     }
+    if ((st & 0xF0) == 0xB0) {
+        /* MIDI learn (DAW profile): the next learnable CC on the voice's channel */
+        if (learn_voice != NO_NOTE && midi_ch[learn_voice] == ch && !cc_reserved(d0)) {
+            uint8_t p, old = cc_map[learn_param];
+            for (p = 0; p < NUM_PARAMS; p++)
+                if (cc_map[p] == d0) cc_map[p] = old; /* swap: no duplicates */
+            cc_map[learn_param] = d0;
+            learn_voice = NO_NOTE;
+            learn_done = 1;
+            return;
+        }
+        /* Fat Chip globals: any channel a voice listens to, once per message */
+        if (d0 >= GCC_FIRST && d0 <= GCC_LAST) {
+            for (v = 0; v < NUM_VOICES; v++) {
+                if (midi_ch[v] == ch) {
+                    midi_activity = 8;
+                    global_cc(d0, d1);
+                    return;
+                }
+            }
+            return;
+        }
+    }
     if ((st & 0xF0) == 0x90 && d1) d1 = apply_curve(d1);
     for (v = 0; v < NUM_VOICES; v++) {
         if (midi_ch[v] != ch) continue;
@@ -196,6 +219,7 @@ void main(void) {
     rx_head = 0;
     rx_tail = 0;
     link_test_reset();
+    cc_map_reset();
     synth_init();
     patches_init();
     setup_load();

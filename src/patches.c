@@ -6,7 +6,7 @@
    damage another game's save (LSDJ keeps its working song at the start of
    save RAM). Setup > SAVE TO CART turns it on after a warning; Fat Chip only
    treats save RAM as its own when it finds its 10-byte marker there. */
-#pragma bank 1
+#pragma bank 9
 #include <string.h>
 #include "engine.h"
 
@@ -145,20 +145,45 @@ void patch_save(uint8_t v, uint8_t slot) BANKED {
 
 /* global setup (MIDI channel map, velocity curve, contrast) */
 #define SETUP_ADDR ((uint8_t *)0xA900)
-static const uint8_t setup_magic[4] = { 'S', 'E', 'T', 2 };
+static const uint8_t setup_magic[4] = { 'S', 'E', 'T', 3 };
+/* layout after the magic: 5 channels, velocity, contrast, profile, CC map */
+#define SU_CH 4
+#define SU_VEL (SU_CH + NUM_VOICES)
+#define SU_CONTRAST (SU_VEL + 1)
+#define SU_PROFILE (SU_CONTRAST + 1)
+#define SU_CCMAP (SU_PROFILE + 1)
+
+static void setup_write(void) {
+    memcpy(SETUP_ADDR, setup_magic, 4);
+    memcpy(SETUP_ADDR + SU_CH, midi_ch, NUM_VOICES);
+    SETUP_ADDR[SU_VEL] = vel_curve;
+    SETUP_ADDR[SU_CONTRAST] = contrast;
+    SETUP_ADDR[SU_PROFILE] = profile;
+    memcpy(SETUP_ADDR + SU_CCMAP, cc_map, NUM_PARAMS);
+}
 
 void setup_load(void) BANKED {
     uint8_t v, c;
     if (!save_on) return;
     ENABLE_RAM;
-    if (!memcmp(SETUP_ADDR, setup_magic, 4)) {
+    if (!memcmp(SETUP_ADDR, setup_magic, 3) && (SETUP_ADDR[3] == 2 || SETUP_ADDR[3] == 3)) {
         for (v = 0; v < NUM_VOICES; v++) {
-            c = SETUP_ADDR[4 + v];
+            c = SETUP_ADDR[SU_CH + v];
             midi_ch[v] = (c > CH_OFF) ? v : c;
         }
-        c = SETUP_ADDR[4 + NUM_VOICES];
+        c = SETUP_ADDR[SU_VEL];
         vel_curve = (c > VEL_FIXED) ? VEL_LINEAR : c;
-        contrast = SETUP_ADDR[5 + NUM_VOICES] ? 1 : 0;
+        contrast = SETUP_ADDR[SU_CONTRAST] ? 1 : 0;
+        if (SETUP_ADDR[3] == 3) {
+            uint8_t ok = 1;
+            profile = SETUP_ADDR[SU_PROFILE] ? PROFILE_FATCHIP : PROFILE_DAW;
+            for (v = 0; v < NUM_PARAMS; v++) {
+                c = SETUP_ADDR[SU_CCMAP + v];
+                if (c > 127 || (cc_reserved(c) && !cc_fixed_param(v))) ok = 0;
+                cc_map[v] = c;
+            }
+            if (!ok) cc_map_reset();
+        }
     }
     DISABLE_RAM;
 }
@@ -166,10 +191,7 @@ void setup_load(void) BANKED {
 void setup_save(void) BANKED {
     if (!save_on) return;
     ENABLE_RAM;
-    memcpy(SETUP_ADDR, setup_magic, 4);
-    memcpy(SETUP_ADDR + 4, midi_ch, NUM_VOICES);
-    SETUP_ADDR[4 + NUM_VOICES] = vel_curve;
-    SETUP_ADDR[5 + NUM_VOICES] = contrast;
+    setup_write();
     DISABLE_RAM;
 }
 
@@ -179,10 +201,7 @@ void save_enable(void) BANKED {
     if (save_on) return;
     ENABLE_RAM;
     memcpy(SRAM_SLOTS, ram_slots, SLOT_BYTES);
-    memcpy(SETUP_ADDR, setup_magic, 4);
-    memcpy(SETUP_ADDR + 4, midi_ch, NUM_VOICES);
-    SETUP_ADDR[4 + NUM_VOICES] = vel_curve;
-    SETUP_ADDR[5 + NUM_VOICES] = contrast;
+    setup_write();
     memcpy(SRAM_MAGIC_ADDR, magic, MAGIC_LEN);
     DISABLE_RAM;
     save_on = 1;

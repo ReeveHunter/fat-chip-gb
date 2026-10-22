@@ -17,7 +17,7 @@ OUT = os.path.join(os.path.dirname(__file__), "out")
 os.makedirs(OUT, exist_ok=True)
 fails = 0
 SRAM_SIZE = 8192
-SETUP_ITEMS = {"shift": 0, "pu2": 2, "contrast": 7, "save": 8}
+SETUP_ITEMS = {"shift": 0, "pu2": 2, "contrast": 8, "save": 9}
 
 
 def check(name, cond, info=""):

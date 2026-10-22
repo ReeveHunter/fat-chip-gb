@@ -56,6 +56,11 @@ you leave the screen; otherwise they last until you switch off.
 or be set to **OFF**. **SHIFT ALL** moves every voice up or down one channel
 at once, keeping a custom layout's gaps and leaving OFF voices alone; it stops
 when a voice reaches 1 or 16. The home screen shows each voice's channel number.
+- **Profile:** DAW (default) or FAT CHIP. A Fat Chip controller switches it
+  over MIDI (CC 102 = 70) and the home header shows **FC**. FAT CHIP forces
+  the default CC map so the controller and the Game Boy always agree.
+- **CC map:** DEFAULT or CUSTOM (DAW profile only); A resets it to the
+  defaults. Learn new CCs on the edit screen with **SELECT+A**.
 - **Contrast:** NORMAL draws labels in dark grey; HIGH draws them black too,
   for screens where the grey is hard to read.
 - **Save to cart (off by default):** with it off, Fat Chip GB never writes to
@@ -153,7 +158,11 @@ last-note priority: release the top note and the previous held note returns
 without a retrigger.
 
 Every parameter below is also a CC. The same CC number means the same idea on
-every channel. CCs edit the live sound (the screen updates too), and SELECT →
+every channel. In the DAW profile you can remap them: on the edit screen,
+highlight a parameter, press **SELECT+A**, then move a knob in your DAW (B
+cancels). If that CC belonged to another parameter, the two swap. Level (7),
+pan (10) and LFO depth (1) are fixed, and 64, 120–127 and the Fat Chip globals
+(102–111) can't be learned. CCs edit the live sound (the screen updates too), and SELECT →
 save stores it.
 
 | CC | Parameter | Pulse | Wave | Noise | Drum (ch5) |
@@ -188,6 +197,26 @@ GLIDE is set), which is good for acid lines and smooth leads.
 
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
+
+### Fat Chip global CCs (102–111)
+
+These work on any channel a voice listens to and affect every voice. Full
+details, plus the startup sequence and bandwidth rules a Fat Chip controller
+follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
+
+| CC | Does |
+|---|---|
+| 102 | Profile: 70 = FAT CHIP, 68 = DAW |
+| 103 | Master tune, 64 = 0, ±50 cents (19 ≈ −35 cents, Synthcart's tuning) |
+| 104 | Warble depth: each voice drifts on its own, up to ±50 cents |
+| 105 | Warble speed |
+| 107 / 108 | Tempo = BPM × 32 (MSB, then LSB) |
+| 109 | Downbeat: beat 1 of the bar is now |
+| 110 | Latch: ≥ 64 holds every voice's notes |
+| 111 | Panic |
+
+Setup's bottom line shows the current tune, tempo and latch; the home header
+blinks a note on each beat once a tempo has been sent.
 
 ### Wave modes (CC71)
 
@@ -336,7 +365,8 @@ change a generator.
 | `src/ui.c` | screens, input, incremental redraw (bank 1) |
 | `src/patches.c` | SRAM patch storage, factory presets (bank 1) |
 | `tools/gen_*.py` | generate pitch tables, wave shapes, drum kits, speech frames, font |
-| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`, `test_live.py`, `test_link.py`) |
+| `test/` | PyBoy emulator tests that inject MIDI into the serial interrupt (`test_engine.py`, `test_channels.py`, `test_live.py`, `test_link.py`, `test_save.py`, `test_fatchip.py`) |
+| `docs/fatchip-protocol.md` | How a Fat Chip controller (Fat Chip 64) drives this ROM |
 
 ### Testing in an emulator
 
