@@ -29,14 +29,17 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED;
 #define SCR_MON 5
 #define SCR_LINK 6
 #define SCR_SAVEWARN 7
-/* SHIFT ALL, 5 voice channels, VELOCITY, CONTRAST, SAVE TO CART, SCREEN OFF, MONITOR, LINK TEST */
-#define SETUP_ITEMS 12
-#define SI_VEL 6
-#define SI_CONTRAST 7
-#define SI_SAVE 8
-#define SI_SCREEN 9
-#define SI_MON 10
-#define SI_LINK 11
+/* SHIFT ALL, 5 voice channels, PROFILE, VELOCITY, CONTRAST, SAVE TO CART,
+   CC MAP, SCREEN OFF, MONITOR, LINK TEST */
+#define SETUP_ITEMS 14
+#define SI_PROFILE 6
+#define SI_VEL 7
+#define SI_CONTRAST 8
+#define SI_SAVE 9
+#define SI_CCMAP 10
+#define SI_SCREEN 11
+#define SI_MON 12
+#define SI_LINK 13
 
 #define ROWS 18
 #define EDIT_FIRST 2
@@ -51,7 +54,7 @@ static uint8_t plist[24], pcount, ecur, escroll, plist_mode;
 static uint8_t shown_val[24];
 static uint8_t meter_shown[NUM_VOICES];
 static uint8_t note_shown[NUM_VOICES];
-static uint8_t act_shown;
+static uint8_t act_shown, beat_shown, prof_shown;
 
 static uint8_t pcur;           /* patch screen cursor */
 static uint8_t kx, ky, npos;   /* name keyboard */
@@ -342,6 +345,12 @@ static void draw_home_row(uint8_t y) {
     lclear();
     if (y == 0) {
         draw_header("FAT CHIP GB");
+        /* FC = Fat Chip profile (a C64 or other Fat Chip controller took over) */
+        if (profile == PROFILE_FATCHIP) lput(13, "FC", T_INV);
+        prof_shown = profile;
+        /* beat blink, once a tempo has been sent */
+        line[17] = (tempo32 && beat_flash) ? T_NOTE : T_INVBLANK;
+        beat_shown = (tempo32 && beat_flash) ? 1 : 0;
         line[19] = midi_activity ? T_NOTE : T_INVBLANK;
         act_shown = midi_activity ? 1 : 0;
     } else if (y >= 2 && y <= 16) {
@@ -393,9 +402,11 @@ static void draw_edit_row(uint8_t y) {
     } else if (y == 17) {
         if (flash) {
             lput(1, flash_msg, 0);
+        } else if (learn_voice != NO_NOTE) {
+            lput(0, "LEARN: MOVE A KNOB", 0);
         } else if (ecur < pcount) {
             lput(0, "CC", T_DIM);
-            lnum(2, param_cc[plist[ecur]], T_DIM);
+            lnum(2, cc_for(plist[ecur]), T_DIM);
             lput(7, "A+<>:FAST", T_DIM);
         }
     }
@@ -508,6 +519,13 @@ static void draw_setup_row(uint8_t y) {
                 lput(x, "-", 0);
                 lnum(x + 1, b + 5, 0);
             }
+        } else if (i == SI_PROFILE) {
+            lput(1, "PROFILE", on ? T_INV : T_DIM);
+            lput(12, profile == PROFILE_FATCHIP ? "FAT CHIP" : "DAW", 0);
+        } else if (i == SI_CCMAP) {
+            lput(1, "CC MAP", on ? T_INV : T_DIM);
+            if (profile == PROFILE_FATCHIP) lput(12, "FIXED", 0);
+            else lput(12, cc_map_custom() ? "CUSTOM" : "DEFAULT", 0);
         } else if (i == SI_VEL) {
             lput(1, "VELOCITY", on ? T_INV : T_DIM);
             lput(12, vel_names[vel_curve & 3], 0);
@@ -535,8 +553,17 @@ static void draw_setup_row(uint8_t y) {
                 lnum(15, midi_ch[v] + 1, 0);
             }
         }
-    } else if (y == 15) {
-        lput(1, "SAME CH = LAYERED", T_DIM);
+    } else if (y == 16) {
+        /* live status of the Fat Chip globals */
+        int16_t c = ((int16_t)tune_cc - 64) * 25 / 32; /* cents */
+        uint8_t x;
+        lput(0, "TUNE", T_DIM);
+        x = lsigned(5, c, 0);
+        if (tempo32) {
+            lput(x + 1, "BPM", T_DIM);
+            lnum(x + 5, (int16_t)(tempo32 >> 5), 0);
+        }
+        if (latch) lput(15, "LATCH", 0);
     } else if (y == 17) {
         if (flash) lput(1, flash_msg, 0);
         else lput(0, "<>:CHANGE  B:BACK", T_DIM);
@@ -585,6 +612,10 @@ static void handle_setup(uint8_t k) {
         } else if (scur == SI_CONTRAST) {
             contrast ^= 1;
             load_dim_tiles();
+        } else if (scur == SI_PROFILE) {
+            profile ^= 1;
+        } else if (scur == SI_CCMAP) {
+            /* A resets */
         } else if (scur == SI_SAVE) {
             toggle_save();
             if (screen != SCR_SETUP) return;
@@ -602,7 +633,19 @@ static void handle_setup(uint8_t k) {
         for (v = 0; v < SETUP_ITEMS; v++) dirty[2 + v] = 1;
     }
     if (k & J_A) {
-        if (scur == SI_SAVE) {
+        if (scur == SI_CCMAP) {
+            if (profile == PROFILE_DAW && cc_map_custom()) {
+                cc_map_reset();
+                setup_changed = 1;
+                show_flash("CC MAP RESET");
+            }
+            dirty[2 + SI_CCMAP] = 1;
+        } else if (scur == SI_PROFILE) {
+            profile ^= 1;
+            setup_changed = 1;
+            dirty[2 + SI_PROFILE] = 1;
+            dirty[2 + SI_CCMAP] = 1;
+        } else if (scur == SI_SAVE) {
             toggle_save();
             if (screen != SCR_SETUP) return;
             for (old = 0; old < SETUP_ITEMS; old++) dirty[2 + old] = 1;
@@ -906,7 +949,26 @@ static void handle_edit(uint8_t k) {
     }
     if (k & J_LEFT) edit_change(-1);
     if (k & J_RIGHT) edit_change(1);
+    if ((keys & J_SELECT) && (k & J_A) && ecur < pcount) {
+        /* SELECT+A: MIDI learn for the highlighted parameter (DAW profile) */
+        uint8_t p = plist[ecur];
+        if (profile != PROFILE_DAW) show_flash("LEARN: DAW PROFILE");
+        else if (cc_fixed_param(p)) show_flash("FIXED CC");
+        else if (learn_voice != NO_NOTE) learn_voice = NO_NOTE;
+        else {
+            learn_param = p;
+            learn_voice = sel;
+            flash = 0; /* show the LEARN prompt, not an old message */
+        }
+        dirty[17] = 1;
+        return;
+    }
     if (k & J_B) {
+        if (learn_voice != NO_NOTE) {
+            learn_voice = NO_NOTE;
+            dirty[17] = 1;
+            return;
+        }
         audition_stop();
         go(SCR_HOME);
     } else if (k & J_SELECT) {
@@ -1060,9 +1122,24 @@ void ui_tick(void) BANKED {
     if (flash && !--flash) dirty[17] = 1;
     if (midi_activity) midi_activity--;
 
+    if (learn_done) {
+        learn_done = 0;
+        setup_save(); /* no-op unless SAVE TO CART is on */
+        show_flash("CC LEARNED");
+    }
+    if (screen != SCR_EDIT && learn_voice != NO_NOTE) learn_voice = NO_NOTE;
+
     /* live updates from MIDI */
+    if (screen == SCR_SETUP && (prof_shown != profile)) {
+        prof_shown = profile;
+        dirty[2 + SI_PROFILE] = 1;
+        dirty[2 + SI_CCMAP] = 1;
+    }
+    if (screen == SCR_SETUP && midi_activity == 8) dirty[16] = 1;
     if (screen == SCR_HOME) {
         if ((midi_activity ? 1 : 0) != act_shown) dirty[0] = 1;
+        if (((tempo32 && beat_flash) ? 1 : 0) != beat_shown) dirty[0] = 1;
+        if (profile != prof_shown) dirty[0] = 1;
         for (v = 0; v < NUM_VOICES; v++) {
             uint8_t n = (voice[v].env_stage != ENV_IDLE) ? voice[v].note : NO_NOTE;
             if (ui_dirty_params & (1 << v)) {

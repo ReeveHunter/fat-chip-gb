@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.4"
+#define VERSION_STR "0.5"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -74,7 +74,44 @@ enum {
 #define LD_TIMBRE 1 /* pulse: duty, wave: timbre */
 #define LD_PAN 2    /* noise: dest 1 is pan */
 
-extern const uint8_t param_cc[NUM_PARAMS];
+extern const uint8_t param_cc[NUM_PARAMS]; /* default CC map (FAT CHIP profile) */
+extern uint8_t cc_map[NUM_PARAMS];          /* user CC map (DAW profile) */
+uint8_t cc_for(uint8_t p);                  /* CC that drives parameter p right now */
+uint8_t cc_fixed_param(uint8_t p);          /* LEVEL, PAN, LFO DEPTH keep 7/10/1 */
+uint8_t cc_reserved(uint8_t cc);            /* never learnable */
+void cc_map_reset(void);
+uint8_t cc_map_custom(void);
+
+/* ------------------------------------------------------------------ Fat Chip globals
+   Global CCs work on any channel a voice listens to and affect every voice.
+   See docs/fatchip-protocol.md. */
+#define PROFILE_DAW 0
+#define PROFILE_FATCHIP 1
+#define GCC_FIRST 102
+#define GCC_PROFILE 102  /* 70 'F' = FAT CHIP, 68 'D' = DAW, other values ignored */
+#define GCC_TUNE 103     /* master tune, 64 = 0, +-50 cents */
+#define GCC_WARBLE 104   /* warble depth 0..127 (0 = off, 127 = +-50 cents) */
+#define GCC_WSPEED 105   /* warble speed 0 (slow, ~2 s) .. 127 (fast) */
+#define GCC_RESERVED 106 /* glitch amount, not yet */
+#define GCC_TEMPO_MSB 107 /* tempo = BPM * 32 as 14 bits; applied when LSB arrives */
+#define GCC_TEMPO_LSB 108
+#define GCC_DOWNBEAT 109 /* any value: beat 1 of a bar is now */
+#define GCC_LATCH 110    /* >= 64 holds every voice's notes */
+#define GCC_PANIC 111    /* any value: all voices off, bends reset, latch off */
+#define GCC_LAST 111
+#define PROFILE_F 70
+#define PROFILE_D 68
+extern uint8_t profile;
+extern int16_t master_tune;  /* 8.8 semitones */
+extern uint8_t tune_cc, warble_amt, warble_spd, latch;
+extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
+extern uint16_t clock24;     /* 24 per beat, reset by the downbeat CC */
+extern uint8_t beat_flash;   /* frames left of the on-beat blink */
+void global_cc(uint8_t cc, uint8_t val);
+void latch_set(uint8_t on);
+/* MIDI learn (DAW profile, edit screen) */
+extern uint8_t learn_voice, learn_param; /* learn_voice = NO_NOTE when idle */
+extern uint8_t learn_done;
 extern const uint8_t param_max[4][NUM_PARAMS];
 extern const uint8_t param_direct[NUM_PARAMS];
 extern const uint8_t voice_type[NUM_VOICES];

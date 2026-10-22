@@ -177,7 +177,7 @@ check("stress: sysex intact", u16(gb, "_lt_sx_len") == 1027, u16(gb, "_lt_sx_len
 
 # screen: Setup (B) -> down to LINK TEST -> A
 gb.press("b")
-for _ in range(11):
+for _ in range(13):
     gb.press("down")
 gb.press("a")
 gb.run(30)

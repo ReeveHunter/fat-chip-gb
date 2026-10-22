@@ -28,6 +28,35 @@ const uint8_t param_cc[NUM_PARAMS] = {
     68, /* LEGATO (standard legato footswitch CC) */
 };
 
+/* user map (DAW profile); FAT CHIP profile always uses param_cc */
+uint8_t cc_map[NUM_PARAMS];
+
+uint8_t cc_fixed_param(uint8_t p) {
+    return p == P_LEVEL || p == P_PAN || p == P_LFO_DEPTH;
+}
+
+/* standard CCs and the Fat Chip globals can't be learned */
+uint8_t cc_reserved(uint8_t cc) {
+    return cc == 1 || cc == 7 || cc == 10 || cc == 64 || cc >= 120 ||
+           (cc >= GCC_FIRST && cc <= GCC_LAST);
+}
+
+uint8_t cc_for(uint8_t p) {
+    return (profile == PROFILE_DAW) ? cc_map[p] : param_cc[p];
+}
+
+void cc_map_reset(void) {
+    uint8_t p;
+    for (p = 0; p < NUM_PARAMS; p++) cc_map[p] = param_cc[p];
+}
+
+uint8_t cc_map_custom(void) {
+    uint8_t p;
+    for (p = 0; p < NUM_PARAMS; p++)
+        if (cc_map[p] != param_cc[p]) return 1;
+    return 0;
+}
+
 /* 1 = CC value is used directly (clamped), 0 = CC 0..127 scaled to 0..max */
 const uint8_t param_direct[NUM_PARAMS] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,

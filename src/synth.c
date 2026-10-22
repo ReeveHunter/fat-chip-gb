@@ -13,6 +13,21 @@ static uint8_t wave_vol_out;   /* last NR32 code written by the synth side */
 static uint8_t rnd_state = 0x5A;
 static uint8_t tick_count;
 
+/* Fat Chip globals */
+uint8_t profile = PROFILE_DAW;
+int16_t master_tune;
+uint8_t tune_cc = 64, warble_amt, warble_spd = 40, latch;
+uint16_t tempo32, clock24;
+uint8_t beat_flash;
+static uint8_t tempo_msb, beat_sub;
+static uint32_t clock_acc;
+uint8_t learn_voice = NO_NOTE, learn_param, learn_done;
+
+/* warble: each pitched voice drifts toward its own random target, so voices
+   wander apart like tape wow (that's the fatness). 8.8 semitone units. */
+static int16_t wb_cur[3], wb_step[3];
+static uint8_t wb_left[3];
+
 #define REG(a) (*(volatile uint8_t *)(a))
 
 /* per-voice register bases (pulse 1, pulse 2, -, noise) */
@@ -58,8 +73,9 @@ static uint16_t pitch_to_period(int16_t p) {
     a = period_tbl[n];
     if (f && n < 127) {
         d = a - period_tbl[n + 1];
-        if (d < 256) a -= (d * f) >> 8;
-        else a -= ((d >> 4) * f) >> 4;
+        /* round to the nearest period step (matters for fine tuning) */
+        if (d < 256) a -= (d * f + 128) >> 8;
+        else a -= ((d >> 4) * f + 8) >> 4;
     }
     return a;
 }
@@ -72,7 +88,11 @@ static int16_t voice_pitch(uint8_t v) {
     voice_t *vo = &voice[v];
     uint8_t *pp = patch[v];
     int16_t p = vo->pitch + vo->bend + vo->penv;
-    if (voice_type[v] != VT_NOISE) p += ((int16_t)pp[P_DETUNE] - 32) << 2;
+    if (voice_type[v] != VT_NOISE) {
+        p += ((int16_t)pp[P_DETUNE] - 32) << 2;
+        p += master_tune;
+        if (v < 3) p += wb_cur[v];
+    }
     if (pp[P_LFO_DEST] == LD_PITCH && pp[P_LFO_DEPTH]) p += lfo_pitch_ofs(vo, pp[P_LFO_DEPTH]);
     return p;
 }
@@ -544,11 +564,55 @@ void note_off(uint8_t v, uint8_t note) {
         start_note(v, vo->held[vo->nheld - 1], vo->vel, 0);
         return;
     }
-    if (vo->sustain) {
+    if (vo->sustain || latch) {
         vo->sus_off = 1;
         return;
     }
     release_voice(v);
+}
+
+/* Latch: like sustain on every voice at once. */
+void latch_set(uint8_t on) {
+    uint8_t v;
+    latch = on;
+    if (on) return;
+    for (v = 0; v < V_DRM; v++) {
+        voice_t *vo = &voice[v];
+        if (vo->sus_off && !vo->sustain && !vo->nheld) {
+            vo->sus_off = 0;
+            release_voice(v);
+        }
+    }
+}
+
+void global_cc(uint8_t cc, uint8_t val) {
+    switch (cc) {
+    case GCC_PROFILE:
+        if (val == PROFILE_F) profile = PROFILE_FATCHIP;
+        else if (val == PROFILE_D) profile = PROFILE_DAW;
+        break;
+    case GCC_TUNE:
+        tune_cc = val;
+        master_tune = ((int16_t)val - 64) << 1; /* 1 step = 0.78 cents */
+        break;
+    case GCC_WARBLE: warble_amt = val; break;
+    case GCC_WSPEED: warble_spd = val; break;
+    case GCC_TEMPO_MSB: tempo_msb = val; break;
+    case GCC_TEMPO_LSB:
+        tempo32 = ((uint16_t)tempo_msb << 7) | val;
+        break;
+    case GCC_DOWNBEAT:
+        clock24 = 0;
+        beat_sub = 0;
+        clock_acc = 0;
+        beat_flash = 6;
+        break;
+    case GCC_LATCH: latch_set(val >= 64); break;
+    case GCC_PANIC:
+        latch_set(0);
+        panic_all();
+        break;
+    }
 }
 
 void all_notes_off(uint8_t v) {
@@ -598,7 +662,7 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
     if (v >= NUM_VOICES) return;
     if (cc == 64) {
         vo->sustain = (val >= 64);
-        if (!vo->sustain && vo->sus_off && !vo->nheld) {
+        if (!vo->sustain && !latch && vo->sus_off && !vo->nheld) {
             vo->sus_off = 0;
             release_voice(v);
         }
@@ -615,7 +679,7 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
     }
     t = voice_type[v];
     for (p = 0; p < NUM_PARAMS; p++) {
-        if (param_cc[p] != cc) continue;
+        if (cc_for(p) != cc) continue;
         max = param_max[t][p];
         if (max == NA) return;
         if (param_direct[p]) val = (val > max) ? max : val;
@@ -826,9 +890,47 @@ static void wave_tick(void) {
     wave_set_vol(wave_vol_code(vo->env_vol));
 }
 
+static void warble_tick(void) {
+    uint8_t v;
+    for (v = 0; v < 3; v++) {
+        if (wb_left[v]) {
+            wb_left[v]--;
+            wb_cur[v] += wb_step[v];
+            continue;
+        }
+        {
+            /* new target: random within +-depth, reached in a random-ish time */
+            int16_t tgt = warble_amt ? (int16_t)(((int16_t)(int8_t)rand8() * warble_amt) >> 7) : 0;
+            uint8_t len = 4 + (uint8_t)(((uint16_t)(127 - warble_spd) * 116) >> 7);
+            len += rand8() & 7;
+            wb_step[v] = (tgt - wb_cur[v]) / (int16_t)len;
+            wb_left[v] = len;
+            if (!wb_step[v]) wb_cur[v] = tgt;
+        }
+    }
+}
+
+/* 24 clocks per beat from the frame rate (59.73 Hz on a DMG):
+   clocks per frame = BPM * 24 / 60 / 59.7275, done as BPM*32*10 / 47782. */
+static void clock_tick(void) {
+    if (!tempo32) return;
+    clock_acc += (uint32_t)tempo32 * 10;
+    while (clock_acc >= 47782UL) {
+        clock_acc -= 47782UL;
+        clock24++;
+        if (++beat_sub >= 24) {
+            beat_sub = 0;
+            beat_flash = 6;
+        }
+    }
+}
+
 void synth_tick(void) {
     uint8_t v, nr51 = 0;
     tick_count++;
+    warble_tick();
+    clock_tick();
+    if (beat_flash) beat_flash--;
     for (v = 0; v < V_DRM; v++) {
         voice_t *vo = &voice[v];
         uint8_t *pp = patch[v];
