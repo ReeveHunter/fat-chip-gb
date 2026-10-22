@@ -19,6 +19,7 @@ int16_t master_tune;
 uint8_t tune_cc = 64, warble_amt, warble_spd = 40, latch;
 uint16_t tempo32, clock24;
 uint8_t beat_flash;
+uint8_t display_req = 0xFF;
 static uint8_t tempo_msb, beat_sub;
 static uint32_t clock_acc;
 uint8_t learn_voice = NO_NOTE, learn_param, learn_done;
@@ -611,6 +612,9 @@ void global_cc(uint8_t cc, uint8_t val) {
     case GCC_PANIC:
         latch_set(0);
         panic_all();
+        break;
+    case GCC_DISPLAY:
+        if (val <= 1) display_req = val; /* the UI applies it */
         break;
     }
 }

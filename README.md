@@ -162,7 +162,7 @@ every channel. In the DAW profile you can remap them: on the edit screen,
 highlight a parameter, press **SELECT+A**, then move a knob in your DAW (B
 cancels). If that CC belonged to another parameter, the two swap. Level (7),
 pan (10) and LFO depth (1) are fixed, and 64, 120–127 and the Fat Chip globals
-(102–111) can't be learned. CCs edit the live sound (the screen updates too), and SELECT →
+(102–112) can't be learned. CCs edit the live sound (the screen updates too), and SELECT →
 save stores it.
 
 | CC | Parameter | Pulse | Wave | Noise | Drum (ch5) |
@@ -198,7 +198,7 @@ GLIDE is set), which is good for acid lines and smooth leads.
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
 
-### Fat Chip global CCs (102–111)
+### Fat Chip global CCs (102–112)
 
 These work on any channel a voice listens to and affect every voice. Full
 details, plus the startup sequence and bandwidth rules a Fat Chip controller
@@ -214,6 +214,7 @@ follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
 | 109 | Downbeat: beat 1 of the bar is now |
 | 110 | Latch: ≥ 64 holds every voice's notes |
 | 111 | Panic |
+| 112 | Display: 0 = screen on, 1 = screen off |
 
 Setup's bottom line shows the current tune, tempo and latch; the home header
 blinks a note on each beat once a tempo has been sent.

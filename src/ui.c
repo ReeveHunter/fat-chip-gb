@@ -1070,6 +1070,22 @@ void ui_tick(void) BANKED {
     uint8_t k = read_keys();
     uint8_t budget, y, v;
 
+    /* screen on/off from a Fat Chip controller (CC 112) */
+    if (display_req != 0xFF) {
+        uint8_t want_off = display_req;
+        display_req = 0xFF;
+        if (want_off && !lcd_off) {
+            lcd_off = 1;
+            DISPLAY_OFF;
+            return;
+        } else if (!want_off && lcd_off) {
+            lcd_off = 0;
+            DISPLAY_ON;
+            dirty_all();
+            return;
+        }
+    }
+
     if (lcd_off) {
         if (midi_activity) midi_activity--;
         ui_dirty_params = 0;

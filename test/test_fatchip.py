@@ -135,6 +135,17 @@ gb.run(5)
 check("panic CC silences every voice and clears latch",
       not sounding(gb, 3) and gb.var("_latch") == 0, hex(gb.mem(0xFF26)))
 
+# ---------------------------------------------------------------- display (CC 112)
+gb.cc(0, 112, 1)
+gb.run(5)
+check("CC112=1 switches the screen off", not (gb.mem(0xFF40) & 0x80))
+gb.note(0, 60, 100); gb.run(5)
+check("synth keeps playing with the screen off", gb.mem(0xFF26) & 1)
+gb.off(0, 60)
+gb.cc(0, 112, 0)
+gb.run(5)
+check("CC112=0 switches it back on", gb.mem(0xFF40) & 0x80)
+
 # ---------------------------------------------------------------- CC map + learn
 def select_a(gb):
     gb.pb.button_press("select")

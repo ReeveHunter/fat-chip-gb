@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.5"
+#define VERSION_STR "0.6"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -98,7 +98,8 @@ uint8_t cc_map_custom(void);
 #define GCC_DOWNBEAT 109 /* any value: beat 1 of a bar is now */
 #define GCC_LATCH 110    /* >= 64 holds every voice's notes */
 #define GCC_PANIC 111    /* any value: all voices off, bends reset, latch off */
-#define GCC_LAST 111
+#define GCC_DISPLAY 112  /* 0 = screen on, 1 = screen off (follows Fat Chip 64's video mode) */
+#define GCC_LAST 112
 #define PROFILE_F 70
 #define PROFILE_D 68
 extern uint8_t profile;
@@ -107,6 +108,7 @@ extern uint8_t tune_cc, warble_amt, warble_spd, latch;
 extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
 extern uint16_t clock24;     /* 24 per beat, reset by the downbeat CC */
 extern uint8_t beat_flash;   /* frames left of the on-beat blink */
+extern uint8_t display_req;  /* 0xFF = none, else GCC_DISPLAY value to apply */
 void global_cc(uint8_t cc, uint8_t val);
 void latch_set(uint8_t on);
 /* MIDI learn (DAW profile, edit screen) */
