@@ -135,6 +135,20 @@ gb.run(5)
 check("panic CC silences every voice and clears latch",
       not sounding(gb, 3) and gb.var("_latch") == 0, hex(gb.mem(0xFF26)))
 
+# ---------------------------------------------------------------- lost note-off
+gb.cc(0, 102, 70)                 # FAT CHIP profile
+gb.cc(0, 72, 0)                   # release 0: a note-off is a cut
+gb.note(0, 60, 120); gb.run(3)
+gb.note(0, 64, 120); gb.run(3)    # the note-off for 60 got lost on the way
+gb.off(0, 64); gb.run(10)
+check("FAT CHIP: a lost note-off doesn't bring the old note back", not sounding(gb, 1))
+gb.cc(0, 102, 68)                 # DAW profile keeps last-note priority
+gb.note(0, 60, 120); gb.run(3)
+gb.note(0, 64, 120); gb.run(3)
+gb.off(0, 64); gb.run(10)
+check("DAW: releasing the top note returns to the held one", sounding(gb, 1))
+gb.off(0, 60); gb.run(10)
+
 # ---------------------------------------------------------------- display (CC 112)
 gb.cc(0, 112, 1)
 gb.run(5)
