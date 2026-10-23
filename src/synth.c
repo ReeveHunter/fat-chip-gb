@@ -549,6 +549,10 @@ void note_on(uint8_t v, uint8_t note, uint8_t vel) {
         uint8_t mode = patch[v][P_MODE];
         uint8_t legato = patch[v][P_LEGATO] && vo->nheld && vo->env_stage != ENV_IDLE &&
                          !(v == V_WAV && (mode == WM_SPEECH || mode == WM_SING));
+        /* FAT CHIP profile: the controller decides what each voice plays, so
+         * a note-on simply replaces. No held-note stack: a note-off lost on
+         * the link can't come back later as a note that never stops. */
+        if (profile == PROFILE_FATCHIP) vo->nheld = 0;
         hold_push(vo, note);
         start_note(v, note, vel, !legato);
     }

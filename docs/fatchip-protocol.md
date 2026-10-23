@@ -1,4 +1,4 @@
-# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.6)
+# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.07)
 
 This is the contract a Fat Chip controller (Fat Chip 64, or a future web controller) uses to drive Fat Chip GB. Everything here is plain channel MIDI: tested on Reeve's rig (Teensyboy Pro, mGB mode, DMG), the link passes notes, CCs, pitch bend and program change, but **not MIDI clock and not SysEx**.
 
@@ -12,9 +12,9 @@ This is the contract a Fat Chip controller (Fat Chip 64, or a future web control
 | Noise | 4 | |
 | Drums | 5 | Sample kit on the wave channel (takes it over briefly) |
 
-- Each voice is **mono, last-note priority**. Several voices can share a channel (unison layers).
+- Each voice is **mono**. In the DAW profile: last-note priority. In the FAT CHIP profile a note-on replaces the voice's note outright (no held-note stack), so a lost note-off can't resurface later. Several voices can share a channel (unison layers).
 - Channels are set on the Game Boy (Setup). Fat Chip 64's Game Boy profile must use the same block; default base channel 1. (The MidiNES usually sits on 2–6, so Reeve will move one of them; keep the base configurable on both sides.)
-- **Use a channel the adapter passes.** A Teensyboy Pro in mGB mode did not pass channel 16.
+- **Use a channel the adapter passes.** A Teensyboy Pro in mGB mode did not pass channel 16. Its firmware (an Arduinoboy fork) maps MIDI channels to Game Boy channels; the default map is 1–15 → 1–15, and it forwards **every** mapped channel, the MidiNES's too, so NES traffic shares the Game Boy link's budget (§6).
 
 ## 2. Startup / resync sequence
 

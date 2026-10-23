@@ -155,7 +155,9 @@ Notes, velocity, pitch bend, sustain (CC64) and Program Change work on every
 channel. **Program Change n** loads saved slot *n* (0–15) for that channel.
 CC 120/123 is all-notes-off and CC 121 resets bend. Mono voices use
 last-note priority: release the top note and the previous held note returns
-without a retrigger.
+without a retrigger. (In the FAT CHIP profile a note-on simply replaces: the
+controller decides what each voice plays, and a note-off lost on the link
+can't bring an old note back later.)
 
 Every parameter below is also a CC. The same CC number means the same idea on
 every channel. In the DAW profile you can remap them: on the edit screen,
