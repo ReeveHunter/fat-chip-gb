@@ -200,7 +200,7 @@ GLIDE is set), which is good for acid lines and smooth leads.
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
 
-### Fat Chip global CCs (102–112)
+### Fat Chip global CCs (102–113)
 
 These work on any channel a voice listens to and affect every voice. Full
 details, plus the startup sequence and bandwidth rules a Fat Chip controller
@@ -217,6 +217,7 @@ follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
 | 110 | Latch: ≥ 64 holds every voice's notes |
 | 111 | Panic |
 | 112 | Display: 0 = screen on, 1 = screen off |
+| 113 | Channels (v0.08), heard on **any** channel: 64 + n moves the five voices to channels n+1–n+5 (74 = 11–15). Fat Chip 64 sends it at startup, so you don't have to set channels by hand. Not saved |
 
 Setup's bottom line shows the current tune, tempo and latch; the home header
 blinks a note on each beat once a tempo has been sent.

@@ -1070,6 +1070,12 @@ void ui_tick(void) BANKED {
     uint8_t k = read_keys();
     uint8_t budget, y, v;
 
+    /* channels moved by a Fat Chip controller (CC 113): show the new ones */
+    if (ch_moved) {
+        ch_moved = 0;
+        if (!lcd_off) dirty_all();
+    }
+
     /* screen on/off from a Fat Chip controller (CC 112) */
     if (display_req != 0xFF) {
         uint8_t want_off = display_req;

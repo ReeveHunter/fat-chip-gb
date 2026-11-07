@@ -211,6 +211,29 @@ cmap = gb.var("_cc_map", 23)
 check("Setup > CC MAP resets to defaults", cmap[P_ATTACK] == CC_ATTACK and cmap[P_DECAY] == CC_DECAY)
 check("still no writes to save RAM", bytes(gb.pb.memory[0, 0xA000:0xBFFF]) == bytes(0x1FFF))
 
+# ---------------------------------------------------------------- CC 113: channels from Fat Chip 64
+gb.press("b"); gb.press("b"); gb.run(10)  # back home
+check("channels start at 1-5", gb.var("_midi_ch", 5) == [0, 1, 2, 3, 4])
+gb.note(0, 60); gb.run(3)
+gb.cc(15, 113, 64 + 10)           # on ch 16, which no voice listens to
+gb.run(5)
+check("CC113 on any channel moves voices to 11-15", gb.var("_midi_ch", 5) == [10, 11, 12, 13, 14])
+check("moving the channels silences held notes", not sounding(gb, 1))
+gb.run(10)
+gb.screenshot(os.path.join(OUT, "home_ch11.png"))
+gb.note(10, 64); gb.run(3)
+check("pulse 1 now plays on ch 11", sounding(gb, 1))
+gb.off(10, 64); gb.run(3)
+gb.cc(3, 113, 20)                 # outside 64-75: ignored
+gb.cc(3, 113, 64 + 12)            # 13-17 doesn't fit: ignored
+gb.run(5)
+check("other CC113 values ignored", gb.var("_midi_ch", 5) == [10, 11, 12, 13, 14])
+gb.note(10, 64); gb.run(3)
+gb.cc(10, 113, 64 + 10)           # same block again: notes keep sounding
+gb.run(3)
+check("same block again doesn't cut notes", sounding(gb, 1))
+check("CC113 never writes save RAM", bytes(gb.pb.memory[0, 0xA000:0xBFFF]) == bytes(0x1FFF))
+
 gb.stop()
 print(f"\n{fails} failure(s)")
 sys.exit(1 if fails else 0)

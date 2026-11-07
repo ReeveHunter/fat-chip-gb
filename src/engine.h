@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.07"
+#define VERSION_STR "0.08"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -100,6 +100,8 @@ uint8_t cc_map_custom(void);
 #define GCC_PANIC 111    /* any value: all voices off, bends reset, latch off */
 #define GCC_DISPLAY 112  /* 0 = screen on, 1 = screen off (follows Fat Chip 64's video mode) */
 #define GCC_LAST 112
+#define GCC_CHANNELS 113 /* 64 + n: voices move to channels n+1..n+5 (n 0-11); heard on ANY channel */
+extern uint8_t ch_moved;     /* the UI redraws after GCC_CHANNELS */
 #define PROFILE_F 70
 #define PROFILE_D 68
 extern uint8_t profile;

@@ -35,6 +35,7 @@ static void vbl(void) {
 }
 
 uint8_t midi_ch[NUM_VOICES] = { 0, 1, 2, 3, 4 };
+uint8_t ch_moved;
 uint8_t vel_curve;
 uint8_t mon_msg[MON_LINES][3];
 uint8_t mon_head;
@@ -80,6 +81,23 @@ static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
             cc_map[learn_param] = d0;
             learn_voice = NO_NOTE;
             learn_done = 1;
+            return;
+        }
+        /* Fat Chip 64 sets the channels: heard on any channel, since the
+           controller can't know which ones the Game Boy listens to yet.
+           Only 64-75 count (a stray CC 113 from a DAW is unlikely to be one). */
+        if (d0 == GCC_CHANNELS) {
+            if (d1 >= 64 && d1 <= 64 + 16 - NUM_VOICES) {
+                d1 -= 64;
+                for (v = 0; v < NUM_VOICES; v++)
+                    if (midi_ch[v] != d1 + v) break;
+                if (v < NUM_VOICES) {
+                    panic_all();
+                    for (v = 0; v < NUM_VOICES; v++) midi_ch[v] = d1 + v;
+                    ch_moved = 1;
+                }
+                midi_activity = 8;
+            }
             return;
         }
         /* Fat Chip globals: any channel a voice listens to, once per message */

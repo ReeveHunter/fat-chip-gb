@@ -20,12 +20,13 @@ This is the contract a Fat Chip controller (Fat Chip 64, or a future web control
 
 The link is one-way, so the controller can't ask the Game Boy anything. Send this **at startup and on every panic**, on the Pulse 1 channel (any voice's channel works):
 
+0. CC 113 = 64 + n (any channel) → the voices move to the controller's block of channels.
 1. CC 102 = 70 → FAT CHIP profile (the header shows **FC**; the default CC map is forced).
 2. CC 111 = 0 → panic (all voices off, bends reset, latch off).
 3. CC 103 master tune, CC 104/105 warble, CC 107/108 tempo, then CC 109 downbeat on the next bar line.
 4. Per voice: Program Change to pick its role patch, CC 7 level, and anything else the role needs.
 
-## 3. Global CCs (102–112)
+## 3. Global CCs (102–113)
 
 Accepted on **any channel a voice listens to**, applied once to every voice. In the DAW profile they work too (they're undefined CCs in General MIDI), and they can't be learned onto parameters.
 
@@ -42,6 +43,7 @@ Accepted on **any channel a voice listens to**, applied once to every voice. In 
 | 110 | Latch | ≥ 64 = hold every voice's notes after note-off (like sustain on all voices); < 64 releases them |
 | 111 | Panic | Any value: all voices off, bends reset, latch off |
 | 112 | Display | 0 = screen on, 1 = screen off (no LCD buzz; the synth keeps running). Fat Chip 64 sends it when its own video mode changes. Values 2+ reserved (visualizer) |
+| 113 | Channels | **Heard on any channel** (v0.08), unlike the others: **64 + n** moves the five voices to channels n+1 … n+5 (n = 0–11, so 64 = 1–5, 74 = 11–15). Other values are ignored. Held notes stop if the block changes. Not saved to the cart. Fat Chip 64 sends it first at startup, so the Game Boy's own channel setting doesn't matter |
 
 The Game Boy's tempo clock runs at 24 steps per beat from its frame rate (59.73 Hz on a DMG; with the screen off it paces from the DIV timer at ~59.80 Hz, 0.1% fast), so the once-per-bar downbeat matters. Nothing uses the clock yet except the beat blink in the home header; the arpeggiator and glitch will.
 
