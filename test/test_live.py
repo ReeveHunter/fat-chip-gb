@@ -11,7 +11,7 @@ ROM = os.path.join(os.path.dirname(__file__), "..", "fat-chip-gb.gb")
 OUT = os.path.join(os.path.dirname(__file__), "out")
 os.makedirs(OUT, exist_ok=True)
 fails = 0
-VOICE_SIZE = 45
+VOICE_SIZE = 48  # (v0.09: + rdrop, rd_on)
 
 
 def check(name, cond, info=""):

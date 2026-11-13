@@ -63,9 +63,11 @@ In the FAT CHIP profile the map is fixed to these defaults (same CC = same idea 
 | 71 | Wave mode | 84 | Speech pitch |
 | 72 | Release | 85 | Bend range (0–24) |
 | 73 | Attack | 86 | Phoneme (sing mode) |
-| 74 | Timbre | 94 | Fine detune (±50 cents) |
-| 75 | Decay | 120/123 | All notes off |
-| 76 | LFO rate | 121 | Reset bend |
+| 74 | Timbre | 87 | Release drop: semitones (0–24, 0 off; v0.09) |
+| 75 | Decay | 88 | Release drop time (0–127 → 16 steps) |
+| 76 | LFO rate | 94 | Fine detune (±50 cents) |
+| | | 120/123 | All notes off |
+| | | 121 | Reset bend |
 
 Program Change n (0–15) loads that voice's saved slot n.
 

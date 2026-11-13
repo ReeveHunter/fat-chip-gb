@@ -190,6 +190,8 @@ save stores it.
 | 84 | Speech pitch (value = note) | | ✓ | | |
 | 85 | Pitch-bend range (0–24 semitones) | ✓ | ✓ | ✓ | |
 | 86 | Phoneme for Sing mode (value = index) | | ✓ | | |
+| 87 | Release drop (v0.09): a note let go sags this many semitones while it rings (0–24, 0 = off). Not saved | ✓ | ✓ | ✓ | |
+| 88 | Release drop time (0–127, in 16 steps like the pitch envelope's). Not saved | ✓ | ✓ | ✓ | |
 | 94 | Fine detune (±50 cents) | ✓ | ✓ | | |
 | 68 | Legato on/off (≥64 = on) | ✓ | ✓ | ✓ | |
 

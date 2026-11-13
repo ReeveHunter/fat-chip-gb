@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.08"
+#define VERSION_STR "0.09"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -107,6 +107,10 @@ extern uint8_t ch_moved;     /* the UI redraws after GCC_CHANNELS */
 extern uint8_t profile;
 extern int16_t master_tune;  /* 8.8 semitones */
 extern uint8_t tune_cc, warble_amt, warble_spd, latch;
+/* release drop per voice (FAT CHIP: CC 87 amount 0-24 semitones, CC 88 time 0-127 -> 0-15); not saved */
+#define CC_RDROP_AMT 87
+#define CC_RDROP_TIME 88
+extern uint8_t rd_amt[NUM_VOICES], rd_time[NUM_VOICES];
 extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
 extern uint16_t clock24;     /* 24 per beat, reset by the downbeat CC */
 extern uint8_t beat_flash;   /* frames left of the on-beat blink */
@@ -156,6 +160,8 @@ typedef struct {
     uint16_t phon_pos; /* 8.8 frame position */
     uint8_t phon_frame;
     uint8_t phon_set;
+    int16_t rdrop;     /* 8.8 release drop offset (CC 87 / 88) */
+    uint8_t rd_on;     /* the release drop is running */
 } voice_t;
 
 #define ENV_IDLE 0

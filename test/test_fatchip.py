@@ -234,6 +234,25 @@ gb.run(3)
 check("same block again doesn't cut notes", sounding(gb, 1))
 check("CC113 never writes save RAM", bytes(gb.pb.memory[0, 0xA000:0xBFFF]) == bytes(0x1FFF))
 
+# v0.09: the release drop (CC 87 amount, CC 88 time): a note let go sags while it rings
+gb.off(10, 64); gb.run(3)
+gb.cc(10, 72, 127)                # long release
+gb.cc(10, 87, 12)                 # an octave
+gb.cc(10, 88, 32)                 # time 4
+gb.note(10, 64); gb.run(20)
+f0 = pulse1_hz(gb)
+gb.off(10, 64); gb.run(4)
+f1 = pulse1_hz(gb)
+gb.run(40)
+f2 = pulse1_hz(gb)
+check("release drop: let go, pulse 1 sags an octave while it rings", f0 > f1 > f2 and abs(f0 / f2 - 2) < 0.03,
+      f"{f0:.1f} {f1:.1f} {f2:.1f}")
+gb.note(10, 64); gb.run(3)
+check("... the next note starts on its pitch", abs(pulse1_hz(gb) - f0) < 0.5, f"{pulse1_hz(gb):.1f}")
+gb.off(10, 64); gb.cc(10, 87, 0); gb.run(3)
+gb.note(10, 64); gb.run(5); gb.off(10, 64); gb.run(40)
+check("CC 87 0: no drop", abs(pulse1_hz(gb) - f0) < 0.5, f"{pulse1_hz(gb):.1f}")
+
 gb.stop()
 print(f"\n{fails} failure(s)")
 sys.exit(1 if fails else 0)

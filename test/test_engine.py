@@ -70,7 +70,7 @@ def main():
     global VOICE_SIZE
     gb = boot()
     # voice_t size = distance between _voice and next symbol isn't reliable; derive from engine.h fields
-    VOICE_SIZE = 45
+    VOICE_SIZE = 48  # (v0.09: + rdrop, rd_on)
 
     # ---- pulse 1 pitch
     for n in (45, 57, 69, 81):

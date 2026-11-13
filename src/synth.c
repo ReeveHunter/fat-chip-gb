@@ -88,7 +88,7 @@ static int16_t lfo_pitch_ofs(voice_t *vo, uint8_t depth) {
 static int16_t voice_pitch(uint8_t v) {
     voice_t *vo = &voice[v];
     uint8_t *pp = patch[v];
-    int16_t p = vo->pitch + vo->bend + vo->penv;
+    int16_t p = vo->pitch + vo->bend + vo->penv + vo->rdrop;
     if (voice_type[v] != VT_NOISE) {
         p += ((int16_t)pp[P_DETUNE] - 32) << 2;
         p += master_tune;
@@ -421,6 +421,8 @@ static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
     vo->vel = vel;
     vo->gate = 1;
     vo->sus_off = 0;
+    vo->rdrop = 0;
+    vo->rd_on = 0;
 
     if (type == VT_WAVE && mode == WM_SPEECH) base = (int16_t)pp[P_SPEECH_PITCH] << 8;
     else base = (int16_t)note << 8;
@@ -493,12 +495,15 @@ static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
     }
 }
 
+uint8_t rd_amt[NUM_VOICES], rd_time[NUM_VOICES];
+
 static void release_voice(uint8_t v) {
     voice_t *vo = &voice[v];
     uint8_t *pp = patch[v];
     uint8_t rel = pp[P_RELEASE];
     vo->gate = 0;
     if (vo->env_stage == ENV_IDLE) return;
+    if (v < V_DRM && rd_amt[v]) vo->rd_on = 1;   /* the release drop: sags while it rings */
     if (voice_type[v] == VT_WAVE) {
         if (!rel) {
             vo->env_stage = ENV_IDLE;
@@ -695,6 +700,8 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
         param_set(v, p, val);
         return;
     }
+    if (cc == CC_RDROP_AMT && v < V_DRM) rd_amt[v] = val > 24 ? 24 : val;
+    else if (cc == CC_RDROP_TIME && v < V_DRM) rd_time[v] = val >> 3;
 }
 
 void voice_refresh(uint8_t v) {
@@ -754,6 +761,18 @@ static void glide_penv_tick(voice_t *vo, uint8_t *pp) {
         vo->penv = (int16_t)(((int32_t)vo->penv * penv_tbl[pp[P_PENV_TIME]]) >> 8);
         if (vo->penv > -16 && vo->penv < 16) vo->penv = 0;
     }
+}
+
+/* the release drop: rdrop eases from 0 to -amount (same curve as the pitch envelope) */
+static void rdrop_tick(uint8_t v) {
+    voice_t *vo = &voice[v];
+    int16_t tgt, d;
+    if (!vo->rd_on) return;
+    tgt = -((int16_t)rd_amt[v] << 8);
+    d = vo->rdrop - tgt;
+    d = (int16_t)(((int32_t)d * penv_tbl[rd_time[v]]) >> 8);
+    if (d > -16 && d < 16) d = 0;
+    vo->rdrop = tgt + d;
 }
 
 static uint8_t pan_bits(uint8_t ch, uint8_t pan) {
@@ -944,6 +963,7 @@ void synth_tick(void) {
         uint8_t *pp = patch[v];
         lfo_tick(vo, pp);
         glide_penv_tick(vo, pp);
+        rdrop_tick(v);
         if (v == V_WAV) wave_tick();
         else pulse_noise_tick(v);
         vo->meter = (vo->env_stage == ENV_IDLE) ? 0 : vo->env_vol;
