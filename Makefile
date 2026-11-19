@@ -13,7 +13,7 @@ LDFLAGS = -Wl-yt0x03 -Wl-yo16 -Wl-ya1 -Wm-yn"FATCHIP GB"
 GEN = src/gen/tables.c src/gen/waves.c src/gen/names.c \
       src/gen/drums.c src/gen/drum_names.c \
       src/gen/speech.c src/gen/speech_tbl.c src/gen/speech_names.c \
-      src/gen/font.c
+      src/gen/font.c src/gen/fcsounds.c
 
 SRC_C = $(wildcard src/*.c) $(GEN)
 SRC_S = $(wildcard src/*.s)

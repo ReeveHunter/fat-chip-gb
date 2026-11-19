@@ -625,6 +625,7 @@ void global_cc(uint8_t cc, uint8_t val) {
     case GCC_DISPLAY:
         if (val <= 1) display_req = val; /* the UI applies it */
         break;
+    case GCC_SOUND: fc_sound_load(val); break;
     }
 }
 

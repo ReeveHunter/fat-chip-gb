@@ -117,6 +117,7 @@ the note currently playing.
 | B | setup: MIDI channels, velocity curve, screen off, MIDI monitor, link test |
 | SELECT + B | copy the selected channel's sound |
 | SELECT + A | paste it onto the selected channel |
+| SELECT + Left / Right | the previous / next Fat Chip sound (Fat Chip 64's built-in sounds) on pulse 1, pulse 2 and the wave |
 | SELECT + START | panic: every voice off, bends reset (works on any screen) |
 
 SELECT on its own acts when you *release* it, so it can double as a modifier.
@@ -181,10 +182,10 @@ save stores it.
 | 75 | Decay (0 = hold) | ✓ | ✓ | ✓ | |
 | 76 | LFO rate (0.08–24 Hz) | ✓ | ✓ | ✓ | |
 | 77 | LFO wave: tri, saw↓, saw↑, square, random | ✓ | ✓ | ✓ | |
-| 78 | LFO destination | pitch / duty / pan | pitch / timbre (PWM in Pulse) / pan | pitch / pan | |
+| 78 | LFO destination (v0.10: shown as VIBRATO / PWM / AUTOPAN, or VIBRATO / TIMBRE / AUTOPAN on the wave) | pitch / duty / pan | pitch / timbre (PWM in Pulse) / pan | pitch / pan | |
 | 79 | LFO delay (fade-in after note) | ✓ | ✓ | ✓ | |
-| 80 | Pitch envelope amount (±24 semitones, 64 = off) | ✓ | ✓ | ✓ | |
-| 81 | Pitch envelope time | ✓ | ✓ | ✓ | |
+| 80 | Pitch envelope amount (±24 semitones, 64 = off; v0.10: shown as BEND IN) | ✓ | ✓ | ✓ | |
+| 81 | Pitch envelope time (BEND TIME) | ✓ | ✓ | ✓ | |
 | 82 | Sweep (hardware, pulse 1 only) | ✓ | | | |
 | 83 | Drum split: notes below this play drums (value = note, 0 = off) | | ✓ | | |
 | 84 | Speech pitch (value = note) | | ✓ | | |
@@ -202,7 +203,7 @@ GLIDE is set), which is good for acid lines and smooth leads.
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
 
-### Fat Chip global CCs (102–113)
+### Fat Chip global CCs (102–114)
 
 These work on any channel a voice listens to and affect every voice. Full
 details, plus the startup sequence and bandwidth rules a Fat Chip controller
@@ -220,6 +221,7 @@ follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
 | 111 | Panic |
 | 112 | Display: 0 = screen on, 1 = screen off |
 | 113 | Channels (v0.08), heard on **any** channel: 64 + n moves the five voices to channels n+1–n+5 (74 = 11–15). Fat Chip 64 sends it at startup, so you don't have to set channels by hand. Not saved |
+| 114 | Fat Chip sound (v0.10): n = Fat Chip 64's built-in sound n on pulse 1, pulse 2 and the wave, with its name. Fat Chip 64 sends it instead of the sound's 45-odd CCs |
 
 Setup's bottom line shows the current tune, tempo and latch; the home header
 blinks a note on each beat once a tempo has been sent.

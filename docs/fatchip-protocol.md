@@ -1,4 +1,4 @@
-# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.07)
+# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.10)
 
 This is the contract a Fat Chip controller (Fat Chip 64, or a future web controller) uses to drive Fat Chip GB. Everything here is plain channel MIDI: tested on Reeve's rig (Teensyboy Pro, mGB mode, DMG), the link passes notes, CCs, pitch bend and program change, but **not MIDI clock and not SysEx**.
 
@@ -26,7 +26,7 @@ The link is one-way, so the controller can't ask the Game Boy anything. Send thi
 3. CC 103 master tune, CC 104/105 warble, CC 107/108 tempo, then CC 109 downbeat on the next bar line.
 4. Per voice: Program Change to pick its role patch, CC 7 level, and anything else the role needs.
 
-## 3. Global CCs (102–113)
+## 3. Global CCs (102–114)
 
 Accepted on **any channel a voice listens to**, applied once to every voice. In the DAW profile they work too (they're undefined CCs in General MIDI), and they can't be learned onto parameters.
 
@@ -44,6 +44,7 @@ Accepted on **any channel a voice listens to**, applied once to every voice. In 
 | 111 | Panic | Any value: all voices off, bends reset, latch off |
 | 112 | Display | 0 = screen on, 1 = screen off (no LCD buzz; the synth keeps running). Fat Chip 64 sends it when its own video mode changes. Values 2+ reserved (visualizer) |
 | 113 | Channels | **Heard on any channel** (v0.08), unlike the others: **64 + n** moves the five voices to channels n+1 … n+5 (n = 0–11, so 64 = 1–5, 74 = 11–15). Other values are ignored. Held notes stop if the block changes. Not saved to the cart. Fat Chip 64 sends it first at startup, so the Game Boy's own channel setting doesn't matter |
+| 114 | Fat Chip sound | (v0.10) **n** = Fat Chip 64's built-in sound n (0–18): pulse 1, pulse 2 and the wave take that sound's settings and name, and the warble is set, exactly as if Fat Chip 64 had sent its CCs (the ROM keeps a copy of them, `src/gen/fcsounds.c`, made by Fat Chip 64's `tools/gen_gb_sounds.py`). Noise and drums are untouched. Values past the last sound are ignored. Fat Chip 64 sends it in place of about 45 CCs when a built-in sound is chosen and nothing in play changes it; afterwards, edits are CCs as usual |
 
 The Game Boy's tempo clock runs at 24 steps per beat from its frame rate (59.73 Hz on a DMG; with the screen off it paces from the DIV timer at ~59.80 Hz, 0.1% fast), so the once-per-bar downbeat matters. Nothing uses the clock yet except the beat blink in the home header; the arpeggiator and glitch will.
 

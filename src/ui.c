@@ -148,9 +148,10 @@ static const char *const mode_names[WM_COUNT] = { "SYNTH", "PULSE", "TRI", "DUAL
 static const char *const duty_names[4] = { "12.5%", "25%", "50%", "75%" };
 static const char *const pan_names[3] = { "LEFT", "CENTER", "RIGHT" };
 static const char *const lfo_names[5] = { "TRI", "SAW DN", "SAW UP", "SQUARE", "RANDOM" };
-static const char *const dest_pulse[3] = { "PITCH", "DUTY", "PAN" };
-static const char *const dest_wave[3] = { "PITCH", "TIMBRE", "PAN" };
-static const char *const dest_noise[2] = { "PITCH", "PAN" };
+/* v0.10: what each LFO destination is, in Fat Chip's words */
+static const char *const dest_pulse[3] = { "VIBRATO", "PWM", "AUTOPAN" };
+static const char *const dest_wave[3] = { "VIBRATO", "TIMBRE", "AUTOPAN" };
+static const char *const dest_noise[2] = { "VIBRATO", "AUTOPAN" };
 
 static const char *param_label(uint8_t v, uint8_t p) {
     uint8_t t = voice_type[v];
@@ -174,8 +175,8 @@ static const char *param_label(uint8_t v, uint8_t p) {
     case P_GLIDE: return "GLIDE";
     case P_BEND: return "BEND RNG";
     case P_DETUNE: return "DETUNE";
-    case P_PENV_AMT: return "PITCH ENV";
-    case P_PENV_TIME: return "P.ENV TIME";
+    case P_PENV_AMT: return "BEND IN";     /* v0.10: Fat Chip's names */
+    case P_PENV_TIME: return "BEND TIME";
     case P_SWEEP: return "SWEEP";
     case P_LFO_SHAPE: return "LFO WAVE";
     case P_LFO_RATE: return "LFO RATE";
@@ -906,7 +907,19 @@ static void handle_home(uint8_t k) {
         dirty[2 + old * 3] = 1;
         dirty[2 + sel * 3] = 1;
     }
-    if (k & (J_LEFT | J_RIGHT)) {
+    if ((keys & J_SELECT) && (k & (J_LEFT | J_RIGHT))) {
+        /* v0.10: SELECT + LEFT / RIGHT: the previous / next Fat Chip sound,
+           on the whole Game Boy (pulse 1, pulse 2, wave) */
+        uint8_t n = fc_sound_count(), c = fc_cur;
+        static char msg[16];
+        if (c >= n) c = (k & J_LEFT) ? 0 : n - 1;
+        c = (k & J_LEFT) ? (c ? c - 1 : n - 1) : (c + 1 >= n ? 0 : c + 1);
+        fc_sound_load(c);
+        memcpy(msg, "SOUND ", 6);
+        fc_sound_name(c, msg + 6);
+        msg[14] = 0;
+        show_flash(msg);
+    } else if (k & (J_LEFT | J_RIGHT)) {
         uint8_t s = patch_slot[sel];
         s = (k & J_LEFT) ? (s - 1) & 15 : (s + 1) & 15;
         patch_load(sel, s);

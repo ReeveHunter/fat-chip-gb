@@ -228,3 +228,59 @@ void patch_slot_name(uint8_t type, uint8_t slot, uint8_t *out) BANKED {
     }
     ram_off();
 }
+
+/* ------------------------------------------------------------------ v0.10: Fat Chip sounds
+   Fat Chip 64's built-in sounds as one patch for the whole Game Boy: per sound,
+   the CCs Fat Chip 64 would send pulse 1, pulse 2 and the wave channel, then
+   the globals (src/gen/fcsounds.c, made from Fat Chip 64's own patches). CC 114
+   n plays sound n, so Fat Chip 64 sends one CC instead of about 45. Applied
+   with the default CC map in either profile. */
+extern const uint8_t fc_sounds_n;
+extern const char fc_sound_names[][8];
+extern const uint16_t fc_sound_ofs[];
+extern const uint8_t fc_sound_data[];
+
+uint8_t fc_cur = 0xFF;
+
+static void fc_cc(uint8_t v, uint8_t cc, uint8_t val) {
+    uint8_t p, max;
+    for (p = 0; p < NUM_PARAMS; p++) {
+        if (param_cc[p] != cc) continue;
+        max = param_max[voice_type[v]][p];
+        if (max == NA) return;
+        if (param_direct[p]) val = (val > max) ? max : val;
+        else val = (uint8_t)(((uint16_t)val * (max + 1)) >> 7);
+        param_set(v, p, val);
+        return;
+    }
+    if (cc == CC_RDROP_AMT) rd_amt[v] = val > 24 ? 24 : val;
+    else if (cc == CC_RDROP_TIME) rd_time[v] = val >> 3;
+}
+
+void fc_sound_load(uint8_t n) BANKED {
+    const uint8_t *d;
+    uint8_t v, cnt, cc;
+    if (n >= fc_sounds_n) return;
+    d = fc_sound_data + fc_sound_ofs[n];
+    for (v = 0; v < 3; v++) {
+        for (cnt = *d++; cnt; cnt--) {
+            cc = *d++;
+            fc_cc(v, cc, *d++);
+        }
+        memcpy(&patch[v][PATCH_NAME_OFS], fc_sound_names[n], PATCH_NAME_LEN);
+        ui_dirty_params |= (uint8_t)(1 << v);
+    }
+    for (cnt = *d++; cnt; cnt--) {
+        cc = *d++;
+        global_cc(cc, *d++);
+    }
+    fc_cur = n;
+}
+
+void fc_sound_name(uint8_t n, char *out) BANKED {
+    memcpy(out, fc_sound_names[n], 8);
+}
+
+uint8_t fc_sound_count(void) BANKED {
+    return fc_sounds_n;
+}

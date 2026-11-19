@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.09"
+#define VERSION_STR "0.10"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -99,7 +99,8 @@ uint8_t cc_map_custom(void);
 #define GCC_LATCH 110    /* >= 64 holds every voice's notes */
 #define GCC_PANIC 111    /* any value: all voices off, bends reset, latch off */
 #define GCC_DISPLAY 112  /* 0 = screen on, 1 = screen off (follows Fat Chip 64's video mode) */
-#define GCC_LAST 112
+#define GCC_SOUND 114   /* v0.10: Fat Chip 64's built-in sound n, from our own copy (src/gen/fcsounds.c) */
+#define GCC_LAST 114
 #define GCC_CHANNELS 113 /* 64 + n: voices move to channels n+1..n+5 (n 0-11); heard on ANY channel */
 extern uint8_t ch_moved;     /* the UI redraws after GCC_CHANNELS */
 #define PROFILE_F 70
@@ -280,5 +281,10 @@ void save_enable(void) BANKED;
 void save_disable(void) BANKED;
 extern uint8_t save_on;   /* patches/setup in cart save RAM (off by default) */
 extern uint8_t contrast;  /* 0 normal, 1 high: grey labels drawn black */
+/* v0.10: Fat Chip sounds (the whole Game Boy: pulse 1, pulse 2, wave) */
+void fc_sound_load(uint8_t n) BANKED;
+void fc_sound_name(uint8_t n, char *out) BANKED;
+uint8_t fc_sound_count(void) BANKED;
+extern uint8_t fc_cur;       /* the last one loaded, 0xFF = none */
 
 #endif
