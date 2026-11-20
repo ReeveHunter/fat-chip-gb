@@ -194,6 +194,7 @@ save stores it.
 | 87 | Release drop (v0.09): a note let go sags this many semitones while it rings (0–24, 0 = off). Not saved | ✓ | ✓ | ✓ | |
 | 88 | Release drop time (0–127, in 16 steps like the pitch envelope's). Not saved | ✓ | ✓ | ✓ | |
 | 89 | BEND SHAPE (v0.12, value as it is): + 1 STEP (held AMOUNT away for BEND TIME, then the note: the blip; SLIDE without), + 2 CLICK SHORT (the note starts with 20 ms of noise on the noise channel) or + 4 CLICK LONG (as long as BEND TIME), while the noise voice is silent | ✓ | ✓ | STEP | |
+| 90 | EASED GLIDE (v0.14, value as it is, not saved): with GLIDE on, a new note is reached along an S curve over this many frames (leaves gently, arrives gently); 0 = the usual glide. Fat Chip 64 sends 90 (1.5 s) in DRONE | ✓ | ✓ | | |
 | 94 | Fine detune (±50 cents) | ✓ | ✓ | | |
 | 68 | Legato on/off (≥64 = on) | ✓ | ✓ | ✓ | |
 

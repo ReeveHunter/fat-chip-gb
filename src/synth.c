@@ -805,6 +805,7 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
     }
     if (cc == CC_RDROP_AMT && v < V_DRM) rd_amt[v] = val > 24 ? 24 : val;
     else if (cc == CC_RDROP_TIME && v < V_DRM) rd_time[v] = val >> 3;
+    else if (cc == CC_EASE && v < V_NOI) ease_len[v] = val;
 }
 
 void voice_refresh(uint8_t v) {
@@ -841,8 +842,36 @@ static void lfo_tick(voice_t *vo, uint8_t *pp) {
     vo->lfo_out = out;
 }
 
+/* v0.14 EASED GLIDE (Fat Chip 64's DRONE): from where the voice was to its
+   new note along 3t^2 - 2t^3 over ease_len frames, so it leaves gently and
+   arrives gently (the usual glide rushes off and creeps in) */
+uint8_t ease_len[NUM_VOICES];
+static uint8_t ease_pos[NUM_VOICES];
+static int16_t ease_from[NUM_VOICES], ease_to[NUM_VOICES];
+
+static uint8_t ease_tick(uint8_t v, voice_t *vo) {
+    uint16_t t, e;
+    if (!ease_len[v] || !patch[v][P_GLIDE]) return 0;
+    if (vo->target != ease_to[v]) {          /* a new note: from here */
+        ease_from[v] = vo->pitch;
+        ease_to[v] = vo->target;
+        ease_pos[v] = 0;
+    }
+    if (vo->pitch == vo->target) return 1;
+    if (++ease_pos[v] >= ease_len[v]) {
+        vo->pitch = vo->target;
+        return 1;
+    }
+    t = ((uint16_t)ease_pos[v] << 8) / ease_len[v];      /* 0-255 */
+    e = (uint16_t)(((uint32_t)t * t * (768 - 2 * t)) >> 16); /* 3t^2 - 2t^3, 0-255 */
+    vo->pitch = ease_from[v] + (int16_t)(((int32_t)(ease_to[v] - ease_from[v]) * (int16_t)e) >> 8);
+    return 1;
+}
+
 static void glide_penv_tick(uint8_t v, voice_t *vo, uint8_t *pp) {
-    if (vo->pitch != vo->target) {
+    if (v < V_NOI && ease_tick(v, vo)) {
+        /* (eased) */
+    } else if (vo->pitch != vo->target) {
         int16_t d = vo->target - vo->pitch;
         uint8_t g = pp[P_GLIDE];
         int16_t s;

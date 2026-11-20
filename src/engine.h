@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.13"
+#define VERSION_STR "0.14"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -118,6 +118,9 @@ extern uint8_t tune_cc, warble_amt, warble_spd, latch;
 #define CC_RDROP_AMT 87
 #define CC_RDROP_TIME 88
 extern uint8_t rd_amt[NUM_VOICES], rd_time[NUM_VOICES];
+/* v0.14: CC 90 EASED GLIDE: a glide eases in and out over this many frames (0 = the usual glide); not saved */
+#define CC_EASE 90
+extern uint8_t ease_len[NUM_VOICES];
 extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
 extern uint8_t trem_depth, trem_shape, trem_sync;
 extern uint16_t trem_rate;    /* Hz x 100 */
