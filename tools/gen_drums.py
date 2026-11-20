@@ -1,30 +1,33 @@
 #!/usr/bin/env python3
 """Synthesize the drum kits (original sounds, no third-party samples).
 
-Each kit lives in its own ROM bank. Samples are 4-bit, packed two per byte,
-padded to whole 32-sample chunks (16 bytes) so the timer ISR can stream them
-one wave-RAM load at a time.
+Every kit has the same 18 slots and owns two 16 KB ROM banks (32 KB), whatever
+it uses of them; its first bank starts with a directory (bank, pointer, chunks
+for each slot). Samples are 4-bit, packed two per byte, padded to whole
+32-sample chunks (16 bytes): the timer ISR streams them one wave-RAM load at a
+time, mixing two hits from the same kit (drum_mixtab).
 
-Outputs src/gen/drums.c (+ drums_kitN.c per bank) and docs/drums/*.wav previews.
+Kits: FC CHIP (the default, as it always played), FC 808 (this file's 808), and
+the kits in drum_synth.py; all but FC CHIP get the LSDJ kit makers' sample prep.
+
+Outputs src/gen/drums.c, drum_names.c and drums_bankN.c per bank.
 """
 import os
 import sys
-import wave
 
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 from cgen import c_array, c_strings, header, pack_nibbles  # noqa: E402
+import drum_synth as ds  # noqa: E402
 
 HERE = os.path.dirname(__file__)
 OUT = os.path.join(HERE, "..", "src", "gen")
-PREV = os.path.join(HERE, "..", "docs", "drums")
 os.makedirs(OUT, exist_ok=True)
-os.makedirs(PREV, exist_ok=True)
 
 DRUM_T = 48
 SR = 524288 / DRUM_T  # ~10923 Hz
-FIRST_BANK = 3
+FIRST_BANK = 16                      # kit k: banks 16 + 2k and 17 + 2k (32 KB each)
 rng = np.random.default_rng(1989)
 
 # sound slots shared by all kits (index -> name); note map below
@@ -190,7 +193,6 @@ def kit_chip():
     return s
 
 
-KITS = [("808", kit_808), ("CHIP", kit_chip)]
 
 
 def to4(x):
@@ -207,14 +209,76 @@ def to4(x):
     return q.tolist()
 
 
-def write_wav(path, q):
-    # preview: 4-bit levels -> 16-bit PCM at SR (rounded)
-    data = ((np.array(q) - 7.5) / 7.5 * 20000).astype("<i2")
-    with wave.open(path, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(int(round(SR)))
-        w.writeframes(data.tobytes())
+def mix_table():
+    """two 4-bit samples (8 = silence) added, with a soft knee into the 4-bit ceiling;
+    index a * 16 + b (symmetric, the ISR relies on that)"""
+    t = []
+    for a in range(16):
+        for b in range(16):
+            s = a + b - 8 - 7.5
+            m = abs(s)
+            if m > 5.5:
+                m = min(7.5, 5.5 + 2.0 * np.tanh((m - 5.5) / 2.0))
+            t.append(int(np.clip(np.floor(7.5 + np.copysign(m, s) + 0.5), 0, 15)))
+    return t
+
+
+def lsdj_prep(x, hi):
+    """the LSDJ kit makers' prep (drum_synth.chain); hi = made at 44.1 kHz"""
+    x = np.asarray(x, float)
+    return ds.chain(ds.to_gb(x) if hi else x, "LSDJ").tolist()
+
+
+def rom_now(x):
+    """FC CHIP as it always played: soft knee, no tail trim"""
+    return to4(x)
+
+
+def kits():
+    """(name, 6-char name, patch name, 18 sounds as 4-bit lists). Order is the
+    MIDI kit number; FC 808 and FC CHIP use this file's own rng, so they are
+    made first and in this order, as they always were."""
+    fc808, fcchip = kit_808(), kit_chip()
+    out = [("FC CHIP", "FCCHIP", "FC CHIP ", {k: rom_now(v) for k, v in fcchip.items()}),
+           ("FC 808", "FC 808", "FC 808  ", {k: lsdj_prep(v, False) for k, v in fc808.items()})]
+    for name, short, pname, fn in [("808", "808   ", "808 KIT ", ds.kit_808), ("909", "909   ", "909 KIT ", ds.kit_909),
+                                   ("CR-78", "CR-78 ", "CR-78   ", ds.kit_cr78), ("CHIP SQ", "CHIPSQ", "CHIP SQ ", ds.kit_chip_sq),
+                                   ("CHIP LFSR", "LFSR  ", "LFSR KIT", ds.kit_chip_lfsr)]:
+        s, _lab, _desc = fn()
+        out.append((name, short, pname, {k: lsdj_prep(v, True) for k, v in s.items()}))
+    return out
+
+
+DIR = 4 * 18                         # each kit's first bank starts with its directory
+
+
+def pack_kit(name, sounds):
+    """put a kit's 18 sounds in its two banks (a sound never crosses a bank);
+    trims the longest tails if the kit runs over"""
+    while True:
+        packed = {n: pack_nibbles(sounds[n]) for n in SLOTS}
+        bins = [[], []]
+        where = {}
+        for n in sorted(SLOTS, key=lambda n: -len(packed[n])):
+            for b in (0, 1):
+                if sum(len(packed[m]) for m in bins[b]) + len(packed[n]) <= 16384 - (DIR if b == 0 else 0):
+                    bins[b].append(n)
+                    where[n] = b
+                    break
+            else:
+                break
+        if len(where) == len(SLOTS):
+            return packed, bins, where
+        longest = max(SLOTS, key=lambda n: len(sounds[n]))
+        cut = max(32, (len(sounds[longest]) * 9 // 10) // 32 * 32)
+        q = list(sounds[longest][:cut])
+        for i in range(1, 33):                            # fade the new end
+            q[-i] = int(round(7.5 + (q[-i] - 7.5) * (i - 1) / 32))
+        print(f"  {name}: {KIT_BYTES} bytes exceeded, trimming {longest}")
+        sounds[longest] = q
+
+
+KIT_BYTES = 32768
 
 
 def main():
@@ -222,46 +286,41 @@ def main():
     for n, i in NOTE_MAP.items():
         note_map[n] = i
 
+    for f in os.listdir(OUT):
+        if f.startswith("drums_bank"):
+            os.remove(os.path.join(OUT, f))
     common = header()
     common += f"#define DRUM_SLOTS {len(SLOTS)}\n"
     common += c_array("drum_note_map", note_map)
-    sbank, soff, slen = [], [], []
-    banks = {}  # bank -> bytes
-    bank = FIRST_BANK
-    banks[bank] = []
-    for k, (kname, fn) in enumerate(KITS):
-        sounds = fn()
+    ks = kits()
+    for k, (kname, _s, _p, sounds) in enumerate(ks):
+        packed, bins, where = pack_kit(kname, sounds)
+        blobs = [[0] * DIR, []]
+        offs = {}
+        for b in (0, 1):
+            for n in bins[b]:
+                offs[n] = 0x4000 + len(blobs[b])
+                blobs[b] += packed[n]
         total = 0
-        for name in SLOTS:
-            q = to4(sounds[name])
-            write_wav(os.path.join(PREV, f"{k}_{kname}_{name.replace(' ', '_')}.wav"), q)
-            packed = pack_nibbles(q)
-            chunks = len(packed) // 16
-            assert chunks < 256, (name, chunks)
-            if len(banks[bank]) + len(packed) > 16384:
-                bank += 1
-                banks[bank] = []
-            sbank.append(bank)
-            soff.append(0x4000 + len(banks[bank]))
-            slen.append(chunks)
-            banks[bank] += packed
-            total += len(packed)
-        print(f"kit {kname}: {total} bytes")
-    for b, blob in banks.items():
-        src = header(b)
-        src += c_array(f"drum_bank{b}_data", blob)
-        open(os.path.join(OUT, f"drums_bank{b}.c"), "w").write(src)
-    print("drum banks", list(banks))
-    common += f"#define DRUM_KITS {len(KITS)}\n"
-    common += f"#define DRUM_LAST_BANK {bank}\n"
-    common += c_array("drum_bank", sbank)
-    common += c_array("drum_ptr", soff, "uint16_t", 8, "0x{:04X}")
-    common += c_array("drum_len", slen)
+        for i, n in enumerate(SLOTS):          # directory: bank, ptr lo, ptr hi, chunks
+            chunks = len(packed[n]) // 16
+            assert 0 < chunks < 256, (kname, n, chunks)
+            blobs[0][4 * i:4 * i + 4] = [FIRST_BANK + 2 * k + where[n], offs[n] & 255, offs[n] >> 8, chunks]
+            total += len(packed[n])
+        for b in (0, 1):
+            bank = FIRST_BANK + 2 * k + b
+            src = header(bank)
+            src += c_array(f"drum_bank{bank}_data", blobs[b])
+            open(os.path.join(OUT, f"drums_bank{bank}.c"), "w").write(src)
+        print(f"kit {k} {kname}: {total} bytes")
+    common += f"#define DRUM_KITS {len(ks)}\n#define DRUM_FIRST_BANK {FIRST_BANK}\n"
     open(os.path.join(OUT, "drums.c"), "w").write(common)
 
     src = header(1)
-    src += c_strings("kit_names", [n for n, _ in KITS], 6)
+    src += c_strings("kit_names", [s for _n, s, _p, _x in ks], 6)
     src += c_strings("drum_slot_names", SLOTS, 6)
+    src += c_strings("kit_patch_names", [p for _n, _s, p, _x in ks], 8)
+    src += c_array("drum_mixtab", mix_table())
     open(os.path.join(OUT, "drum_names.c"), "w").write(src)
 
 

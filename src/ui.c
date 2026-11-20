@@ -168,7 +168,7 @@ static const char *param_label(uint8_t v, uint8_t p) {
     case P_TIMBRE:
         if (t == VT_DRUM) return "PITCH";
         return (mode == WM_SPEECH || mode == WM_SING) ? "SPEED" : "TIMBRE";
-    case P_MODE: return "MODE";
+    case P_MODE: return t == VT_DRUM ? "HATS" : "MODE";
     case P_ATTACK: return "ATTACK";
     case P_DECAY: return "DECAY";
     case P_RELEASE: return "RELEASE";
@@ -211,7 +211,10 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
         if (t == VT_DRUM) lsigned(x, (int16_t)val - 12, base);
         else lnum(x, val, base);
         return;
-    case P_MODE: lput(x, mode_names[val >= WM_COUNT ? 0 : val], base); return;
+    case P_MODE:
+        if (t == VT_DRUM) lput(x, val ? "NOISE" : "SAMPLE", base);
+        else lput(x, mode_names[val >= WM_COUNT ? 0 : val], base);
+        return;
     case P_DECAY:
         if (!val) { lput(x, "HOLD", base); return; }
         break;
@@ -287,9 +290,10 @@ static void build_plist(void) {
     if (t == VT_DRUM) {
         plist[0] = P_SHAPE;
         plist[1] = P_TIMBRE;
-        plist[2] = P_LEVEL;
-        plist[3] = P_PAN;
-        pcount = 4;
+        plist[2] = P_MODE;
+        plist[3] = P_LEVEL;
+        plist[4] = P_PAN;
+        pcount = 5;
     } else {
         for (i = 0; (p = o[i]) != 0xFF; i++) {
             if (param_max[t][p] == NA) continue;

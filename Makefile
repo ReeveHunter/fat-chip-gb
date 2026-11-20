@@ -8,7 +8,7 @@ ROM   = fat-chip-gb.gb
 BUILD = build
 
 CFLAGS  = -Isrc -Wf--opt-code-speed -Wf--max-allocs-per-node50000
-LDFLAGS = -Wl-yt0x03 -Wl-yo16 -Wl-ya1 -Wm-yn"FATCHIP GB"
+LDFLAGS = -Wl-yt0x03 -Wl-yo32 -Wl-ya1 -Wm-yn"FATCHIP GB"
 
 GEN = src/gen/tables.c src/gen/waves.c src/gen/names.c \
       src/gen/drums.c src/gen/drum_names.c \

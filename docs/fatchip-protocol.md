@@ -64,8 +64,8 @@ In the FAT CHIP profile the map is fixed to these defaults (same CC = same idea 
 | 10 | Pan | 80 | Pitch envelope amount |
 | 64 | Sustain | 81 | Pitch envelope time |
 | 68 | Legato | 82 | Sweep (pulse 1) |
-| 70 | Shape (duty / wave / chord / kit) | 83 | Drum split note |
-| 71 | Wave mode | 84 | Speech pitch |
+| 70 | Shape (duty / wave / chord / kit 0–6, v0.17) | 83 | Drum split note |
+| 71 | Wave mode (ch 5: HATS sample / noise, v0.17) | 84 | Speech pitch |
 | 72 | Release | 85 | Bend range (0–24) |
 | 73 | Attack | 86 | Phoneme (sing mode) |
 | 74 | Timbre | 87 | Release drop: semitones (0–24, 0 off; v0.09) |

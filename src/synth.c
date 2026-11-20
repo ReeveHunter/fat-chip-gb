@@ -98,7 +98,7 @@ static int16_t voice_pitch(uint8_t v) {
     return p;
 }
 
-static uint8_t vel_vol(uint8_t vel, uint8_t level) {
+uint8_t vel_vol(uint8_t vel, uint8_t level) {
     uint16_t v = (((uint16_t)(vel >> 3) + 1) * ((uint16_t)level + 1)) >> 4;
     if (v > 15) v = 15;
     if (!v && vel && level) v = 1;
@@ -306,42 +306,68 @@ static void stream_stop(void) {
     st_done = 0;
 }
 
+uint8_t click_left;
+extern const uint8_t drum_mixtab[256];   /* gen/drum_names.c, bank 1 */
+
 static void drum_hit(uint8_t note, uint8_t vel) {
     uint8_t *dp = patch[V_DRM];
     uint8_t slot = drum_note_map[note & 127];
-    uint8_t idx, t, lvl, code, save, i;
-    const uint8_t *src;
+    uint8_t kit, t, lvl, code, s, save, db, dl;
+    const uint8_t *dir;
+    const uint8_t *dptr;
     uint16_t x;
     if (slot == 0xFF) return;
-    idx = dp[P_SHAPE] * DRUM_SLOTS + slot;
+    if (dp[P_MODE] && noise_hat(slot, vel)) {      /* HATS NOISE (hats.c) */
+        voice[V_DRM].meter = (vel >> 3) | 1;
+        return;
+    }
+    kit = dp[P_SHAPE] < DRUM_KITS ? dp[P_SHAPE] : 0;
     t = drum_tick_tbl[dp[P_TIMBRE] > 24 ? 24 : dp[P_TIMBRE]];
     lvl = vel_vol(vel, dp[P_LEVEL]);
     code = wave_vol_code(lvl);
     if (!code) return;
     x = 2048 - ((uint16_t)t << 2);
 
+    save = _current_bank;
+    SWITCH_ROM(DRUM_FIRST_BANK + 2 * kit);
+    dir = (const uint8_t *)0x4000 + slot * 4;
+    db = dir[0];
+    dptr = (const uint8_t *)(dir[1] | ((uint16_t)dir[2] << 8));
+    dl = dir[3];
+    SWITCH_ROM(save);
+
     __critical {
-        st_active = 0;
+        if (!st_active) ds_left[0] = ds_left[1] = 0;
+        else if (nxt_mask) {
+            /* take back the chunk already mixed, so the new hit starts now */
+            for (s = 0; s < 2; s++) {
+                ds_ptr[s] -= 16;
+                ds_left[s]++;
+            }
+            nxt_mask = 0;
+        }
+        /* two streams: the same sound again takes its own stream (a roll),
+         * else a free one, else the one nearer its end */
+        if (ds_left[0] && ds_slot[0] == slot) s = 0;
+        else if (ds_left[1] && ds_slot[1] == slot) s = 1;
+        else if (!ds_left[0]) s = 0;
+        else if (!ds_left[1]) s = 1;
+        else s = ds_left[1] < ds_left[0];
+        ds_bank[s] = db;
+        ds_ptr[s] = dptr;
+        ds_left[s] = dl;
+        ds_slot[s] = slot;
+        st_active = 1;
         st_done = 0;
         st_nr34 = 0x80 | (uint8_t)(x >> 8);
-        src = (const uint8_t *)drum_ptr[idx];
-        save = _current_bank;
-        SWITCH_ROM(drum_bank[idx]);
-        NR30_REG = 0;
-        for (i = 0; i < 16; i++) AUD3WAVE[i] = src[i];
-        SWITCH_ROM(save);
-        NR30_REG = 0x80;
+        drum_mix();                   /* both playing: mix the first chunk */
         NR32_REG = code << 5;
         wave_vol_out = 0xFF; /* synth side must rewrite when it resumes */
         NR33_REG = (uint8_t)x;
-        NR34_REG = st_nr34;
-        st_bank = drum_bank[idx];
-        st_ptr = (uint8_t *)(src + 16);
-        st_left = drum_len[idx] - 1;
+        drum_next();
         TMA_REG = (uint8_t)(256 - t);
         TIMA_REG = (uint8_t)(256 - t);
-        if (st_left) st_active = 1;
-        else st_done = 1;
+        drum_mix();
     }
     wave_owner = WO_DRUM;
     voice[V_DRM].meter = (vel >> 3) | 1;
@@ -416,11 +442,10 @@ static const uint8_t step_frames[16] = { 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 24
 /* CLICK: the start of a pulse or wave note as a burst of noise, on the noise
    channel while the noise voice is silent (it gives the channel back when
    its own note starts). SHORT: about 20 ms (the hardware length counter). */
-static uint8_t click_left;
 static uint8_t step_left[NUM_VOICES];  /* STEP: frames held away before the jump */
 
 static void click_start(uint8_t vol, uint8_t mode, uint8_t frames) {
-    if (voice[V_NOI].env_stage != ENV_IDLE || !vol) return;
+    if (voice[V_NOI].env_stage != ENV_IDLE || noise_drum || !vol) return;
     NR42_REG = (uint8_t)(vol << 4);
     NR43_REG = 0x01;                     /* bright noise */
     if (mode == 1) {
@@ -467,7 +492,7 @@ static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
 
     vo->penv = ((int16_t)pp[P_PENV_AMT] - 24) << ((pp[P_BEND_MODE] & 8) ? 9 : 8);   /* (v0.16 bit 3: x 2) */
     step_left[v] = ((pp[P_BEND_MODE] & 1) && vo->penv) ? step_frames[pp[P_PENV_TIME] & 15] : 0;
-    if (type == VT_NOISE) click_left = 0;   /* (the noise voice takes its channel back) */
+    if (type == VT_NOISE) click_left = noise_drum = 0;   /* (the noise voice takes its channel back) */
     else if (pp[P_BEND_MODE] & 6)
         click_start(vel_vol(vel, pp[P_LEVEL]), (pp[P_BEND_MODE] >> 1) & 3, step_frames[pp[P_PENV_TIME] & 15]);
     vo->lfo_phase = 0x4000;
@@ -757,6 +782,11 @@ void all_notes_off(uint8_t v) {
     vo->nheld = 0;
     vo->sustain = 0;
     vo->sus_off = 0;
+    if (v == V_DRM && noise_drum) {
+        noise_drum = 0;
+        NR42_REG = 0;
+        NR44_REG = 0x80;
+    }
     if (v == V_DRM || (v == V_WAV && wave_owner == WO_DRUM)) {
         stream_stop();
         NR32_REG = 0;
@@ -815,8 +845,8 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
         return;
     }
     t = voice_type[v];
-    for (p = 0; p < NUM_PARAMS; p++) {
-        if (cc_for(p) != cc) continue;
+    p = cc_to_param(cc);
+    if (p != 0xFF) {
         max = param_max[t][p];
         if (max == NA) return;
         if (param_direct[p]) val = (val > max) ? max : val;
@@ -1117,6 +1147,7 @@ void synth_tick(void) {
     warble_tick();
     clock_tick();
     click_tick();
+    if (noise_drum) noise_drum--;
     trem_tick();
     if (beat_flash) beat_flash--;
     for (v = 0; v < V_DRM; v++) {
@@ -1135,7 +1166,7 @@ void synth_tick(void) {
     nr51 |= pan_bits(0, voice_pan(V_PU1));
     nr51 |= pan_bits(1, voice_pan(V_PU2));
     nr51 |= pan_bits(2, wave_owner == WO_DRUM ? patch[V_DRM][P_PAN] : voice_pan(V_WAV));
-    nr51 |= pan_bits(3, voice_pan(V_NOI));
+    nr51 |= pan_bits(3, noise_drum ? patch[V_DRM][P_PAN] : voice_pan(V_NOI));
     if (nr51 != nr51_shadow) {
         nr51_shadow = nr51;
         NR51_REG = nr51;
@@ -1154,6 +1185,13 @@ void synth_init(void) {
     wave_owner = WO_NONE;
     st_active = 0;
     st_done = 0;
+    noise_drum = 0;
+    {
+        uint8_t save = _current_bank;
+        SWITCH_ROM(1);
+        memcpy(MIX_TAB, drum_mixtab, 256);
+        SWITCH_ROM(save);
+    }
 
     NR52_REG = 0x80;
     NR50_REG = 0x77;

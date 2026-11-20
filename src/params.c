@@ -1,4 +1,5 @@
 /* Parameter metadata shared by the MIDI handler (bank 0) and the UI (bank 1). */
+#include <string.h>
 #include "engine.h"
 
 /* MIDI CC number for each parameter (same CC across channels) */
@@ -49,6 +50,23 @@ uint8_t cc_for(uint8_t p) {
 void cc_map_reset(void) {
     uint8_t p;
     for (p = 0; p < NUM_PARAMS; p++) cc_map[p] = param_cc[p];
+    cc_lut_ok = 0;
+}
+
+/* CC -> parameter, a table rebuilt when the map or the profile changes (a search
+ * of all the parameters cost ~1300 cycles a CC: Fat Chip 64's bursts backed up) */
+uint8_t cc_lut_ok;
+static uint8_t cc_lut_prof, cc_param[128];
+
+uint8_t cc_to_param(uint8_t cc) {
+    if (!cc_lut_ok || cc_lut_prof != profile) {
+        uint8_t p = NUM_PARAMS;
+        memset(cc_param, 0xFF, 128);
+        while (p--) cc_param[cc_for(p) & 127] = p;   /* (the lowest parameter wins) */
+        cc_lut_ok = 1;
+        cc_lut_prof = profile;
+    }
+    return cc_param[cc & 127];
 }
 
 uint8_t cc_map_custom(void) {
@@ -68,7 +86,7 @@ const uint8_t param_max[4][NUM_PARAMS] = {
     /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1, 13 },
     /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1, 13 },
     /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1, 9 },
-    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
+    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, 1, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
 };
 
 const uint8_t voice_type[NUM_VOICES] = { VT_PULSE, VT_PULSE, VT_WAVE, VT_NOISE, VT_DRUM };

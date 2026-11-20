@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.16"
+#define VERSION_STR "0.17"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -81,6 +81,8 @@ uint8_t cc_for(uint8_t p);                  /* CC that drives parameter p right 
 uint8_t cc_fixed_param(uint8_t p);          /* LEVEL, PAN, LFO DEPTH keep 7/10/1 */
 uint8_t cc_reserved(uint8_t cc);            /* never learnable */
 void cc_map_reset(void);
+extern uint8_t cc_lut_ok;                   /* clear after changing cc_map */
+uint8_t cc_to_param(uint8_t cc);            /* parameter CC cc drives, or 0xFF */
 uint8_t cc_map_custom(void);
 
 /* ------------------------------------------------------------------ Fat Chip globals
@@ -196,8 +198,15 @@ extern uint8_t wave_owner;
 extern uint8_t wave_buf[16];
 extern uint8_t wv_nr33, wv_nr34;
 extern volatile uint8_t rx_head, rx_tail;
-extern volatile uint8_t st_active, st_done, st_bank, st_left, st_nr34;
-extern uint8_t *volatile st_ptr;
+extern volatile uint8_t st_active, st_done, st_nr34, nxt_mask;
+extern volatile uint8_t ds_bank[2], ds_left[2], ds_slot[2];
+extern const uint8_t *volatile ds_ptr[2];
+void drum_next(void);          /* play the next chunk (mixed, or straight from ROM) */
+void drum_mix(void);           /* both streams playing: mix the chunk after it */
+#define MIX_TAB ((uint8_t *)0xDB00)
+extern uint8_t noise_drum, click_left;
+uint8_t noise_hat(uint8_t slot, uint8_t vel) BANKED;   /* hats.c */
+uint8_t vel_vol(uint8_t vel, uint8_t level);           /* velocity x level -> 0..15 */
 void wave_commit(void);        /* load wave_buf into wave RAM and trigger */
 void sio_isr(void);
 void tim_isr(void);
@@ -263,14 +272,12 @@ extern const uint8_t drum_tick_tbl[25];
 extern const uint8_t penv_tbl[16];
 extern const uint8_t dual_mult_tbl[16];
 extern const uint8_t drum_note_map[128];
-extern const uint8_t drum_bank[];
-extern const uint16_t drum_ptr[];
-extern const uint8_t drum_len[];
 extern const uint16_t speech_start[];
 extern const uint8_t speech_count[];
 extern const uint8_t speech_hold[];
 #define DRUM_SLOTS 18
-#define DRUM_KITS 2
+#define DRUM_KITS 7
+#define DRUM_FIRST_BANK 16   /* kit k: banks 16 + 2k, 17 + 2k; directory at 0x4000 */
 #define SPEECH_PHONEMES 41
 #define SPEECH_SET_FRAMES 260
 #define WAVES_BANK 2

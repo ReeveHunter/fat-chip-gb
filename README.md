@@ -3,7 +3,7 @@
 A MIDI sound module for the original Game Boy (DMG), in the spirit of
 [mGB](https://github.com/trash80/mGB). Every sound channel is played live from
 your DAW over an Arduinoboy, with no tracker. The wave channel has extra modes:
-a morphing wavetable synth, dual-tone/chord waves, a sampled drum kit, and
+a morphing wavetable synth, dual-tone/chord waves, seven sampled drum kits, and
 LSDJ-style allophone speech you can sing with.
 
 Formerly **gbmidi**. Fat Chip GB is the Game Boy part of **Fat Chip**, a live rig where a
@@ -19,12 +19,12 @@ plans live in `../fat-chip/fat-chip-brief.md` (section 8).
  3 WAV ACID SWP  ▬▬▬▬
    SYNTH ACID     C2
  4 NOI HAT
- 5 DRM 808 KIT   ▬▬
+ 5 DRM FC CHIP   ▬▬
 ```
 
 ## Quick start
 
-1. Flash `fat-chip-gb.gb` to your cart. It's MBC1 + 8 KB battery SRAM, 256 KB.
+1. Flash `fat-chip-gb.gb` to your cart. It's MBC1 + 8 KB battery SRAM, 512 KB (v0.17; 256 KB before).
    **It doesn't write to the cart's save RAM unless you turn that on** (Setup >
    SAVE TO CART), so it's safe on multi-ROM carts that share one save with LSDJ.
 2. Set the Arduinoboy to **mGB mode** (mode 5 / LED 5). It forwards MIDI
@@ -37,7 +37,7 @@ plans live in `../fat-chip/fat-chip-brief.md` (section 8).
 | 2 | Pulse 2 |
 | 3 | Wave: Synth / Pulse / Tri / Dual / Drums / Speech / Sing modes |
 | 4 | Noise |
-| 5 | Drum kit (sampled, plays on the wave channel) |
+| 5 | Drum kit (sampled, plays on the wave channel; hats on the noise channel with HATS NOISE) |
 
 Ch 3 and ch 5 share the wave hardware. A drum hit on ch 5 briefly takes over
 the channel. When the sample ends, a note still held on ch 3 comes back. This
@@ -174,8 +174,8 @@ save stores it.
 | 5 | Glide time | ✓ | ✓ | ✓ | |
 | 7 | Level | ✓ | ✓ | ✓ | ✓ |
 | 10 | Pan (L / C / R) | ✓ | ✓ | ✓ | ✓ |
-| 70 | Shape | duty 12.5/25/50/75% | wave shape · duty in Pulse · chord in Dual | width long/short | kit (808 / CHIP) |
-| 71 | Mode | | Synth · Pulse · Tri · Dual · Drums · Speech · Sing | | |
+| 70 | Shape | duty 12.5/25/50/75% | wave shape · duty in Pulse · chord in Dual | width long/short | kit (7, see Drum kits) |
+| 71 | Mode | | Synth · Pulse · Tri · Dual · Drums · Speech · Sing | | HATS: sample / noise (v0.17) |
 | 72 | Release (0 = cut) | ✓ | ✓ | ✓ | |
 | 73 | Attack (0 = instant) | ✓ | ✓ | ✓ | |
 | 74 | Timbre | | morph step / chord timbre / speech speed | | pitch ±12 |
@@ -276,10 +276,38 @@ synth.
 | 45, 47 | Mid tom | 61 | Blip |
 | 46 | Open hat | 62 | Boom (long sub) |
 
-There are two kits, **808** and **CHIP** (crunchy, square-based), selected by
-CC70 on ch 5. Samples are 4-bit at ~10.9 kHz and were synthesized from scratch
-by `tools/gen_drums.py`, so there are no third-party samples. CC74 on ch 5
-repitches the kit by ±12 semitones.
+There are seven kits, selected by CC70 on ch 5 (v0.17; there were two). All
+were synthesized from scratch (`tools/gen_drums.py`, `tools/drum_synth.py`), so
+there are no third-party samples. Samples are 4-bit at ~10.9 kHz; all but FC CHIP
+get the sample prep LSDJ kit makers use (low cut, a mid lift, then pushed into a
+limiter so the 16 levels are used).
+
+| CC70 | Kit | |
+|---|---|---|
+| 0–18 | FC CHIP | the default: crunchy square-based kit, the old CHIP kit as it was |
+| 19–36 | FC 808 | the old 808 kit |
+| 37–54 | 808 | modelled on the TR-808: bridged-T kick and toms, six-square metal hats |
+| 55–73 | 909 | modelled on the TR-909: swept, clicky kick; noisy snare; bright clap |
+| 74–91 | CR-78 | modelled on the CR-78: congas, bongos, guiro, tambourine in the clap/tom slots |
+| 92–109 | CHIP SQ | square and pulse waves with noise |
+| 110–127 | CHIP LFSR | the Game Boy's own stepped triangle and noise |
+
+**Two hits at once (v0.17).** Two sounds from the kit play together, mixed on the
+fly (a soft clip keeps loud pairs in the 16 levels), so a kick rings under a
+snare. A third hit takes over the one nearer its end; the same sound again (a roll)
+restarts itself. Mixing takes about a quarter of the Game Boy's time at the
+usual pitch while two hits overlap (half at +12), so the Game Boy has less spare
+time for MIDI then: it still keeps up with far more than Fat Chip 64 sends.
+
+**HATS (CC71 on ch 5, v0.17): SAMPLE / NOISE.** NOISE plays the closed and open
+hats, crash, ride and shaker on the noise channel (closed cuts open, as on a
+drum machine), leaving the wave channel to the drums. A hat takes the noise
+channel from the noise voice; a noise note takes it back.
+
+CC74 on ch 5 repitches the kit by ±12 semitones.
+
+Each kit owns two 16 KB ROM banks (32 KB, about 6 s of sound), and every kit
+has the same 18 slots, so a beat plays sensibly on any kit.
 
 ### Allophones (Speech mode: note → sound)
 
@@ -339,7 +367,8 @@ Example: "hello" = HH EH L OW = D#4, D2, G3, C#3 (notes 63, 38, 55, 49).
   when an LFO sweeps timbre, and at the ~60 Hz speech frame rate. LSDJ's wave
   synth and speech have the same character.
 - **Drums** stream 32-sample chunks from ROM using a timer interrupt, the same
-  approach LSDJ kits use.
+  approach LSDJ kits use. Two hits are mixed a chunk ahead through a 256-byte
+  table (two 4-bit samples in, one out), in RAM at 0xDB00.
 - **Speech** is formant synthesis: each allophone is a sequence of
   single-cycle waveforms generated by `tools/gen_speech.py`. There are two
   sets, tuned for low and high voices, and the engine picks one from the
@@ -358,7 +387,7 @@ Example: "hello" = HH EH L OW = D#4, D2, G3, C#3 (notes 63, 38, 55, 49).
 ## Building
 
 Needs [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020/releases) 4.3+ and
-Python 3 with numpy (plus Pillow for the preview images).
+Python 3 with numpy and scipy (the drum kits), plus Pillow for the preview images.
 
 ```sh
 make GBDK_HOME=/path/to/gbdk          # builds fat-chip-gb.gb

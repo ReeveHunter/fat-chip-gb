@@ -79,6 +79,7 @@ static void midi_dispatch(uint8_t st, uint8_t d0, uint8_t d1) {
             for (p = 0; p < NUM_PARAMS; p++)
                 if (cc_map[p] == d0) cc_map[p] = old; /* swap: no duplicates */
             cc_map[learn_param] = d0;
+            cc_lut_ok = 0;
             learn_voice = NO_NOTE;
             learn_done = 1;
             return;
@@ -224,11 +225,17 @@ void load_ui_tiles(void) {
     SWITCH_ROM(save);
 }
 
-/* contrast switch: only the 64 label tiles change, so only reload those */
+/* contrast switch: only the 64 label tiles change, so only reload those.
+ * The screen is on: one tile at a time with interrupts held, so no interrupt
+ * lands between the copy's "VRAM free" check and its write (a lost byte). */
 void load_dim_tiles(void) {
-    uint8_t save = _current_bank;
+    uint8_t save = _current_bank, i;
+    const uint8_t *src;
     SWITCH_ROM(FONT_BANK);
-    set_bkg_data(T_DIM, 64, contrast ? ui_tiles_dimhi : ui_tiles + T_DIM * 16);
+    src = contrast ? ui_tiles_dimhi : ui_tiles + T_DIM * 16;
+    for (i = 0; i < 64; i++) {
+        __critical { set_bkg_data(T_DIM + i, 1, src + (uint16_t)i * 16); }
+    }
     SWITCH_ROM(save);
 }
 
