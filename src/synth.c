@@ -598,7 +598,7 @@ void latch_set(uint8_t on) {
 void global_cc(uint8_t cc, uint8_t val) {
     switch (cc) {
     case GCC_PROFILE:
-        if (val == PROFILE_F) profile = PROFILE_FATCHIP;
+        if (val == PROFILE_F) { profile = PROFILE_FATCHIP; fc_synced = 1; }
         else if (val == PROFILE_D) profile = PROFILE_DAW;
         break;
     case GCC_TUNE:
@@ -625,7 +625,7 @@ void global_cc(uint8_t cc, uint8_t val) {
     case GCC_DISPLAY:
         if (val <= 1) display_req = val; /* the UI applies it */
         break;
-    case GCC_SOUND: fc_sound_load(val); break;
+    case GCC_SOUND: fc_sound_cc(val); break;
     }
 }
 

@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.10"
+#define VERSION_STR "0.11"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -283,6 +283,8 @@ extern uint8_t save_on;   /* patches/setup in cart save RAM (off by default) */
 extern uint8_t contrast;  /* 0 normal, 1 high: grey labels drawn black */
 /* v0.10: Fat Chip sounds (the whole Game Boy: pulse 1, pulse 2, wave) */
 void fc_sound_load(uint8_t n) BANKED;
+void fc_sound_cc(uint8_t val) BANKED;
+extern uint8_t fc_synced;
 void fc_sound_name(uint8_t n, char *out) BANKED;
 uint8_t fc_sound_count(void) BANKED;
 extern uint8_t fc_cur;       /* the last one loaded, 0xFF = none */

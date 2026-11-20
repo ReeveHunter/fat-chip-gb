@@ -241,6 +241,8 @@ extern const uint16_t fc_sound_ofs[];
 extern const uint8_t fc_sound_data[];
 
 uint8_t fc_cur = 0xFF;
+uint8_t fc_synced;                 /* v0.11: 0 from power-on until Fat Chip 64 is heard */
+static uint8_t fc_shown = 0xFE;    /* the name on the cards: a sound, 63 CUSTOM */
 
 static void fc_cc(uint8_t v, uint8_t cc, uint8_t val) {
     uint8_t p, max;
@@ -275,6 +277,38 @@ void fc_sound_load(uint8_t n) BANKED {
         global_cc(cc, *d++);
     }
     fc_cur = n;
+    fc_shown = n;
+}
+
+/* CC 114: n (0-63) plays sound n; 64 + n says "Fat Chip 64 is on sound n"
+   (64 + 63: a sound of its own, CUSTOM). Fat Chip 64 sends that every few
+   seconds and after it sends a sound as CCs. Straight after power-on (a Game
+   Boy switched on late) the first one also sets the FAT CHIP profile and
+   plays the sound; after that it only puts the name on the cards. */
+void fc_sound_cc(uint8_t val) BANKED {
+    uint8_t v, n = val & 63;
+    if (val < 64) {
+        fc_synced = 1;
+        fc_sound_load(n);
+        return;
+    }
+    if (!fc_synced) {
+        fc_synced = 1;
+        global_cc(GCC_PROFILE, PROFILE_F);
+        if (n < fc_sounds_n) {
+            fc_sound_load(n);
+            return;
+        }
+    }
+    if (n >= fc_sounds_n) n = 63;
+    if (n == fc_shown) return;
+    for (v = 0; v < 3; v++) {
+        if (n == 63) memcpy(&patch[v][PATCH_NAME_OFS], "CUSTOM  ", PATCH_NAME_LEN);
+        else memcpy(&patch[v][PATCH_NAME_OFS], fc_sound_names[n], PATCH_NAME_LEN);
+        ui_dirty_params |= (uint8_t)(1 << v);
+    }
+    fc_shown = n;
+    fc_cur = (n == 63) ? 0xFF : n;
 }
 
 void fc_sound_name(uint8_t n, char *out) BANKED {
