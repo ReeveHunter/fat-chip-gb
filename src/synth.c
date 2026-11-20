@@ -633,6 +633,57 @@ void latch_set(uint8_t on) {
     }
 }
 
+/* v0.13: tremolo on the master volume (NR50), like the SID's: no clicks.
+   A phase per frame from the rate (FREE, Hz x 100) or the tempo (a SYNC
+   division, back to the start of its cycle on the downbeat); the shape gives
+   an amount 0-127, the depth (0-15) how much of the volume it takes. */
+uint8_t trem_depth, trem_shape, trem_sync, trem_rmsb;
+uint16_t trem_rate;
+static uint16_t trem_phase, trem_inc;
+static uint8_t trem_rnd, nr50_shadow = 0x77;
+static const uint8_t trem_cyc[10] = { 0, 96, 48, 24, 18, 12, 8, 6, 4, 3 }; /* clocks (24 a beat) */
+static const uint8_t trem_gates[3] = { 0xAD, 0xDA, 0x92 };              /* X.X.XX.X XX.XX.X. X..X..X. */
+
+static void trem_calc(void) {
+    if (trem_sync && tempo32)   /* 65536 x clocks a frame / the cycle: tempo32 x 10 / 47782 a frame */
+        trem_inc = (uint16_t)(((uint32_t)tempo32 * 14045UL) / (1024UL * trem_cyc[trem_sync]));
+    else                        /* Hz x 100 -> 65536 / 59.73 / 100 */
+        trem_inc = (uint16_t)(((uint32_t)trem_rate * 11234UL) >> 10);
+}
+
+static void trem_tick(void) {
+    uint8_t x, a, att, vol;
+    uint16_t old;
+    if (!trem_depth) {
+        if (nr50_shadow != 0x77) NR50_REG = nr50_shadow = 0x77;
+        return;
+    }
+    old = trem_phase;
+    trem_phase += trem_inc;
+    if (trem_phase < old) trem_rnd = rand8() >> 1;
+    x = trem_phase >> 8;
+    switch (trem_shape) {
+    case 0: a = x < 128 ? x : 255 - x; break;                 /* TRI */
+    case 1: a = x < 128 ? x : 255 - x;                         /* SINE: eased (3t^2 - 2t^3) */
+        { uint16_t t2 = ((uint16_t)a * a) >> 7; a = (uint8_t)((t2 * (uint16_t)(381 - 2 * a)) >> 7); }
+        break;
+    case 2: a = (255 - x) >> 1; break;                         /* SAW UP: the volume rises */
+    case 3: a = x >> 1; break;                                 /* SAW DOWN */
+    case 4: a = x < 128 ? 127 : 0; break;                      /* SQUARE */
+    case 5: a = trem_rnd; break;                               /* RANDOM: a level a cycle */
+    case 6:                                                    /* PUMP: ducked, then a swell */
+        if (x < 26) a = 127;
+        else if (x >= 154) a = 0;
+        else { uint8_t y = 127 - (x - 26); a = (uint8_t)(((uint16_t)y * y) >> 7); }
+        break;
+    default: a = (trem_gates[(trem_shape - 7) % 3] & (0x80 >> (x >> 5))) ? 0 : 127; /* GATEs */
+    }
+    att = (uint8_t)(((uint16_t)trem_depth * a * 2 + 127) >> 8); /* 0-15 (depth 15, a 127: 15) */
+    vol = 7 - (uint8_t)(((uint16_t)att * 15) >> 5);            /* 7 .. 0 */
+    vol |= vol << 4;
+    if (vol != nr50_shadow) NR50_REG = nr50_shadow = vol;
+}
+
 void global_cc(uint8_t cc, uint8_t val) {
     switch (cc) {
     case GCC_PROFILE:
@@ -648,8 +699,10 @@ void global_cc(uint8_t cc, uint8_t val) {
     case GCC_TEMPO_MSB: tempo_msb = val; break;
     case GCC_TEMPO_LSB:
         tempo32 = ((uint16_t)tempo_msb << 7) | val;
+        trem_calc();
         break;
     case GCC_DOWNBEAT:
+        if (trem_sync && !(96 % trem_cyc[trem_sync])) trem_phase = 0;
         clock24 = 0;
         beat_sub = 0;
         clock_acc = 0;
@@ -664,6 +717,17 @@ void global_cc(uint8_t cc, uint8_t val) {
         if (val <= 1) display_req = val; /* the UI applies it */
         break;
     case GCC_SOUND: fc_sound_cc(val); break;
+    case GCC_TREM_DEPTH: trem_depth = val > 15 ? 15 : val; break;
+    case GCC_TREM_SHAPE: trem_shape = val > 9 ? 0 : val; break;
+    case GCC_TREM_SYNC:
+        trem_sync = val > 9 ? 0 : val;
+        trem_calc();
+        break;
+    case GCC_TREM_RMSB: trem_rmsb = val; break;
+    case GCC_TREM_RLSB:
+        trem_rate = ((uint16_t)trem_rmsb << 7) | val;
+        trem_calc();
+        break;
     }
 }
 
@@ -999,6 +1063,7 @@ void synth_tick(void) {
     warble_tick();
     clock_tick();
     click_tick();
+    trem_tick();
     if (beat_flash) beat_flash--;
     for (v = 0; v < V_DRM; v++) {
         voice_t *vo = &voice[v];

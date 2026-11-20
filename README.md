@@ -204,7 +204,7 @@ GLIDE is set), which is good for acid lines and smooth leads.
 Scaled CCs map 0–127 across the parameter's range. CCs 83, 84 and 86 take the
 value directly.
 
-### Fat Chip global CCs (102–114)
+### Fat Chip global CCs (102–119)
 
 These work on any channel a voice listens to and affect every voice. Full
 details, plus the startup sequence and bandwidth rules a Fat Chip controller
@@ -223,6 +223,7 @@ follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
 | 112 | Display: 0 = screen on, 1 = screen off |
 | 113 | Channels (v0.08), heard on **any** channel: 64 + n moves the five voices to channels n+1–n+5 (74 = 11–15). Fat Chip 64 sends it at startup, so you don't have to set channels by hand. Not saved |
 | 114 | Fat Chip sound (v0.10): n = Fat Chip 64's built-in sound n on pulse 1, pulse 2 and the wave, with its name. Fat Chip 64 sends it instead of the sound's 45-odd CCs. 64 + n (v0.11): Fat Chip 64's status after a sound sent as CCs: names the cards (127: CUSTOM), and right after power-on it also sets the FAT CHIP profile and plays the sound, for a Game Boy switched on late (Fat Chip 64: CTRL + S off and on resends everything) |
+| 115–119 | Tremolo (v0.13) on the master volume, done here: 115 depth (0–15), 116 shape (TRI, SINE, SAW UP, SAW DOWN, SQUARE, RANDOM, PUMP, three GATEs), 117 sync (0 FREE, 1 BAR … 1/32: locked to the tempo, back to the cycle's start on the downbeat), 118 / 119 the FREE rate in Hz × 100 (MSB, then LSB). Fat Chip 64 sends the patch's tremolo |
 
 Setup's bottom line shows the current tune, tempo and latch; the home header
 blinks a note on each beat once a tempo has been sent.

@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.12"
+#define VERSION_STR "0.13"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -101,7 +101,12 @@ uint8_t cc_map_custom(void);
 #define GCC_PANIC 111    /* any value: all voices off, bends reset, latch off */
 #define GCC_DISPLAY 112  /* 0 = screen on, 1 = screen off (follows Fat Chip 64's video mode) */
 #define GCC_SOUND 114   /* v0.10: Fat Chip 64's built-in sound n, from our own copy (src/gen/fcsounds.c) */
-#define GCC_LAST 114
+#define GCC_TREM_DEPTH 115 /* v0.13: tremolo (the master volume, NR50) depth 0-15 */
+#define GCC_TREM_SHAPE 116 /*   TRI SINE SAW UP SAW DOWN SQUARE RANDOM PUMP GATE X.X.XX.X GATE XX.XX.X. GATE X..X..X. */
+#define GCC_TREM_SYNC 117  /*   0 FREE, 1 BAR 1/2 1/4 1/8D 1/8 1/8T 1/16 1/16T 1/32 (locked to the tempo and downbeat) */
+#define GCC_TREM_RMSB 118  /*   FREE rate: Hz x 100 as 14 bits, MSB, */
+#define GCC_TREM_RLSB 119  /*   then LSB (applied when it arrives) */
+#define GCC_LAST 119
 #define GCC_CHANNELS 113 /* 64 + n: voices move to channels n+1..n+5 (n 0-11); heard on ANY channel */
 extern uint8_t ch_moved;     /* the UI redraws after GCC_CHANNELS */
 #define PROFILE_F 70
@@ -114,6 +119,8 @@ extern uint8_t tune_cc, warble_amt, warble_spd, latch;
 #define CC_RDROP_TIME 88
 extern uint8_t rd_amt[NUM_VOICES], rd_time[NUM_VOICES];
 extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
+extern uint8_t trem_depth, trem_shape, trem_sync;
+extern uint16_t trem_rate;    /* Hz x 100 */
 extern uint16_t clock24;     /* 24 per beat, reset by the downbeat CC */
 extern uint8_t beat_flash;   /* frames left of the on-beat blink */
 extern uint8_t display_req;  /* 0xFF = none, else GCC_DISPLAY value to apply */
