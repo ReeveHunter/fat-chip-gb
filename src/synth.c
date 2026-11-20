@@ -644,9 +644,25 @@ static uint8_t trem_rnd, nr50_shadow = 0x77;
 static const uint8_t trem_cyc[10] = { 0, 96, 48, 24, 18, 12, 8, 6, 4, 3 }; /* clocks (24 a beat) */
 static const uint8_t trem_gates[3] = { 0xAD, 0xDA, 0x92 };              /* X.X.XX.X XX.XX.X. X..X..X. */
 
+/* a phase step a frame for a SYNC division at this tempo (65536 x clocks a
+   frame / the cycle; clocks a frame = tempo32 x 10 / 47782) */
+static uint16_t sync_inc(uint8_t div) {
+    return (uint16_t)(((uint32_t)tempo32 * 14045UL) / (1024UL * trem_cyc[div]));
+}
+
+/* v0.15: each voice's LFO SYNC (CC 91) and its step at this tempo */
+uint8_t lfo_sync[NUM_VOICES];
+uint16_t lfo_sinc[NUM_VOICES];          /* (not static: the tests read it) */
+
+static void lfo_sync_calc(uint8_t v) {
+    lfo_sinc[v] = (lfo_sync[v] && tempo32) ? sync_inc(lfo_sync[v]) : 0;
+}
+
 static void trem_calc(void) {
-    if (trem_sync && tempo32)   /* 65536 x clocks a frame / the cycle: tempo32 x 10 / 47782 a frame */
-        trem_inc = (uint16_t)(((uint32_t)tempo32 * 14045UL) / (1024UL * trem_cyc[trem_sync]));
+    uint8_t v;
+    for (v = 0; v < V_DRM; v++) lfo_sync_calc(v);
+    if (trem_sync && tempo32)
+        trem_inc = sync_inc(trem_sync);
     else                        /* Hz x 100 -> 65536 / 59.73 / 100 */
         trem_inc = (uint16_t)(((uint32_t)trem_rate * 11234UL) >> 10);
 }
@@ -703,6 +719,11 @@ void global_cc(uint8_t cc, uint8_t val) {
         break;
     case GCC_DOWNBEAT:
         if (trem_sync && !(96 % trem_cyc[trem_sync])) trem_phase = 0;
+        {
+            uint8_t v;
+            for (v = 0; v < V_DRM; v++)
+                if (lfo_sinc[v] && !(96 % trem_cyc[lfo_sync[v]])) voice[v].lfo_phase = 0x4000;
+        }
         clock24 = 0;
         beat_sub = 0;
         clock_acc = 0;
@@ -806,6 +827,10 @@ void control_change(uint8_t v, uint8_t cc, uint8_t val) {
     if (cc == CC_RDROP_AMT && v < V_DRM) rd_amt[v] = val > 24 ? 24 : val;
     else if (cc == CC_RDROP_TIME && v < V_DRM) rd_time[v] = val >> 3;
     else if (cc == CC_EASE && v < V_NOI) ease_len[v] = val;
+    else if (cc == CC_LFO_SYNC && v < V_DRM) {
+        lfo_sync[v] = val > 9 ? 0 : val;
+        lfo_sync_calc(v);
+    }
 }
 
 void voice_refresh(uint8_t v) {
@@ -819,11 +844,11 @@ void voice_refresh(uint8_t v) {
 }
 
 /* ------------------------------------------------------------------ per-tick */
-static void lfo_tick(voice_t *vo, uint8_t *pp) {
+static void lfo_tick(uint8_t v, voice_t *vo, uint8_t *pp) {
     uint16_t old = vo->lfo_phase;
     uint8_t ph;
     int8_t out;
-    vo->lfo_phase += lfo_rate_tbl[pp[P_LFO_RATE]];
+    vo->lfo_phase += lfo_sinc[v] ? lfo_sinc[v] : lfo_rate_tbl[pp[P_LFO_RATE]];   /* (v0.15: SYNC) */
     ph = vo->lfo_phase >> 8;
     switch (pp[P_LFO_SHAPE]) {
     case LFO_TRI: out = (ph < 128) ? (int8_t)(ph * 2 - 128) : (int8_t)(127 - (ph - 128) * 2); break;
@@ -1097,7 +1122,7 @@ void synth_tick(void) {
     for (v = 0; v < V_DRM; v++) {
         voice_t *vo = &voice[v];
         uint8_t *pp = patch[v];
-        lfo_tick(vo, pp);
+        lfo_tick(v, vo, pp);
         glide_penv_tick(v, vo, pp);
         rdrop_tick(v);
         if (v == V_WAV) wave_tick();

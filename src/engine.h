@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.14"
+#define VERSION_STR "0.15"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -121,6 +121,9 @@ extern uint8_t rd_amt[NUM_VOICES], rd_time[NUM_VOICES];
 /* v0.14: CC 90 EASED GLIDE: a glide eases in and out over this many frames (0 = the usual glide); not saved */
 #define CC_EASE 90
 extern uint8_t ease_len[NUM_VOICES];
+/* v0.15: CC 91 LFO SYNC: 0 FREE (LFO RATE), 1 BAR ... 1/32 (as the tremolo's): the voice's LFO locked to the tempo; not saved */
+#define CC_LFO_SYNC 91
+extern uint8_t lfo_sync[NUM_VOICES];
 extern uint16_t tempo32;     /* BPM * 32, 0 = no tempo yet */
 extern uint8_t trem_depth, trem_shape, trem_sync;
 extern uint16_t trem_rate;    /* Hz x 100 */

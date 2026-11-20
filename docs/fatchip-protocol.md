@@ -1,4 +1,4 @@
-# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.14)
+# Fat Chip GB ↔ Fat Chip 64: MIDI protocol (v0.15)
 
 This is the contract a Fat Chip controller (Fat Chip 64, or a future web controller) uses to drive Fat Chip GB. Everything here is plain channel MIDI: tested on Reeve's rig (Teensyboy Pro, mGB mode, DMG), the link passes notes, CCs, pitch bend and program change, but **not MIDI clock and not SysEx**.
 
@@ -72,6 +72,7 @@ In the FAT CHIP profile the map is fixed to these defaults (same CC = same idea 
 | 75 | Decay | 88 | Release drop time (0–127 → 16 steps) |
 | 76 | LFO rate | 89 | BEND SHAPE (v0.12): +1 STEP, +2 CLICK SHORT / +4 LONG (as it is) |
 | | | 90 | EASED GLIDE frames (v0.14, as it is; 0 = the usual glide): Fat Chip 64's DRONE |
+| | | 91 | LFO SYNC (v0.15, as it is): 0 FREE, 1–9 a division (as CC 117) from the tempo, back to its start on the downbeat |
 | | | 94 | Fine detune (±50 cents) |
 | | | 120/123 | All notes off |
 | | | 121 | Reset bend |

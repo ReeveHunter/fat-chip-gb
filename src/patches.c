@@ -258,6 +258,7 @@ static void fc_cc(uint8_t v, uint8_t cc, uint8_t val) {
     if (cc == CC_RDROP_AMT) rd_amt[v] = val > 24 ? 24 : val;
     else if (cc == CC_RDROP_TIME) rd_time[v] = val >> 3;
     else if (cc == CC_EASE) ease_len[v] = val;
+    else if (cc == CC_LFO_SYNC) control_change(v, cc, val);   /* (v0.15: it works out the step) */
 }
 
 void fc_sound_load(uint8_t n) BANKED {

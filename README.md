@@ -195,6 +195,7 @@ save stores it.
 | 88 | Release drop time (0–127, in 16 steps like the pitch envelope's). Not saved | ✓ | ✓ | ✓ | |
 | 89 | BEND SHAPE (v0.12, value as it is): + 1 STEP (held AMOUNT away for BEND TIME, then the note: the blip; SLIDE without), + 2 CLICK SHORT (the note starts with 20 ms of noise on the noise channel) or + 4 CLICK LONG (as long as BEND TIME), while the noise voice is silent | ✓ | ✓ | STEP | |
 | 90 | EASED GLIDE (v0.14, value as it is, not saved): with GLIDE on, a new note is reached along an S curve over this many frames (leaves gently, arrives gently); 0 = the usual glide. Fat Chip 64 sends 90 (1.5 s) in DRONE | ✓ | ✓ | | |
+| 91 | LFO SYNC (v0.15, value as it is, not saved): 0 FREE (LFO RATE), 1 1 BAR, 2 1/2, 3 1/4, 4 1/8 dotted, 5 1/8, 6 1/8T, 7 1/16, 8 1/16T, 9 1/32: the LFO runs from the tempo (CC 107 / 108) and back to its start on the downbeat. Fat Chip 64 sends VIBRATO SYNC or PWM SYNC | ✓ | ✓ | ✓ | |
 | 94 | Fine detune (±50 cents) | ✓ | ✓ | | |
 | 68 | Legato on/off (≥64 = on) | ✓ | ✓ | ✓ | |
 
