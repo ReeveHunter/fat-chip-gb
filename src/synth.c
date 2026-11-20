@@ -409,6 +409,40 @@ static void pulse1_sweep(uint8_t s) {
     NR10_REG = r;
 }
 
+/* v0.12: BEND IN STEP holds AMOUNT away this many frames (BEND TIME 0-15:
+   17 ms to 1 s), then jumps to the note; LONG CLICK lasts as long */
+static const uint8_t step_frames[16] = { 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 24, 30, 36, 48, 60 };
+
+/* CLICK: the start of a pulse or wave note as a burst of noise, on the noise
+   channel while the noise voice is silent (it gives the channel back when
+   its own note starts). SHORT: about 20 ms (the hardware length counter). */
+static uint8_t click_left;
+static uint8_t step_left[NUM_VOICES];  /* STEP: frames held away before the jump */
+
+static void click_start(uint8_t vol, uint8_t mode, uint8_t frames) {
+    if (voice[V_NOI].env_stage != ENV_IDLE || !vol) return;
+    NR42_REG = (uint8_t)(vol << 4);
+    NR43_REG = 0x01;                     /* bright noise */
+    if (mode == 1) {
+        NR41_REG = 59;                   /* (64 - 59) / 256 s = 20 ms */
+        NR44_REG = 0xC0;
+        click_left = 2;
+    } else {
+        NR41_REG = 0;
+        NR44_REG = 0x80;
+        click_left = frames;
+    }
+    voice[V_NOI].out_period = 0xFFFF;    /* (its next note writes NR43 again) */
+}
+
+static void click_tick(void) {
+    if (!click_left || --click_left) return;
+    if (voice[V_NOI].env_stage == ENV_IDLE) {
+        NR42_REG = 0;
+        NR44_REG = 0x80;
+    }
+}
+
 static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
     voice_t *vo = &voice[v];
     uint8_t *pp = patch[v];
@@ -432,6 +466,10 @@ static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
     if (!retrig) return; /* legato return to an older held note: pitch only */
 
     vo->penv = ((int16_t)pp[P_PENV_AMT] - 24) << 8;
+    step_left[v] = ((pp[P_BEND_MODE] & 1) && vo->penv) ? step_frames[pp[P_PENV_TIME] & 15] : 0;
+    if (type == VT_NOISE) click_left = 0;   /* (the noise voice takes its channel back) */
+    else if (pp[P_BEND_MODE] >> 1)
+        click_start(vel_vol(vel, pp[P_LEVEL]), pp[P_BEND_MODE] >> 1, step_frames[pp[P_PENV_TIME] & 15]);
     vo->lfo_phase = 0x4000;
     vo->lfo_wait = pp[P_LFO_DELAY] << 3;
     vo->env_acc = 0;
@@ -739,7 +777,7 @@ static void lfo_tick(voice_t *vo, uint8_t *pp) {
     vo->lfo_out = out;
 }
 
-static void glide_penv_tick(voice_t *vo, uint8_t *pp) {
+static void glide_penv_tick(uint8_t v, voice_t *vo, uint8_t *pp) {
     if (vo->pitch != vo->target) {
         int16_t d = vo->target - vo->pitch;
         uint8_t g = pp[P_GLIDE];
@@ -758,7 +796,9 @@ static void glide_penv_tick(voice_t *vo, uint8_t *pp) {
             vo->pitch += s;
         }
     }
-    if (vo->penv) {
+    if (step_left[v]) {                  /* v0.12 STEP: held, then the note */
+        if (!--step_left[v]) vo->penv = 0;
+    } else if (vo->penv) {
         vo->penv = (int16_t)(((int32_t)vo->penv * penv_tbl[pp[P_PENV_TIME]]) >> 8);
         if (vo->penv > -16 && vo->penv < 16) vo->penv = 0;
     }
@@ -958,12 +998,13 @@ void synth_tick(void) {
     tick_count++;
     warble_tick();
     clock_tick();
+    click_tick();
     if (beat_flash) beat_flash--;
     for (v = 0; v < V_DRM; v++) {
         voice_t *vo = &voice[v];
         uint8_t *pp = patch[v];
         lfo_tick(vo, pp);
-        glide_penv_tick(vo, pp);
+        glide_penv_tick(v, vo, pp);
         rdrop_tick(v);
         if (v == V_WAV) wave_tick();
         else pulse_noise_tick(v);

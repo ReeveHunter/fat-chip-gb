@@ -50,8 +50,8 @@ static uint8_t sel;            /* selected voice */
 static uint8_t dirty[ROWS];
 static uint8_t line[20];
 
-static uint8_t plist[24], pcount, ecur, escroll, plist_mode;
-static uint8_t shown_val[24];
+static uint8_t plist[25], pcount, ecur, escroll, plist_mode;
+static uint8_t shown_val[25];
 static uint8_t meter_shown[NUM_VOICES];
 static uint8_t note_shown[NUM_VOICES];
 static uint8_t act_shown, beat_shown, prof_shown;
@@ -187,6 +187,7 @@ static const char *param_label(uint8_t v, uint8_t p) {
     case P_SPEECH_PITCH: return "VOICE PCH";
     case P_PHONEME: return "PHONEME";
     case P_LEGATO: return "LEGATO";
+    case P_BEND_MODE: return "BEND SHAPE"; /* v0.12 */
     }
     return "?";
 }
@@ -249,6 +250,10 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
         return;
     case P_SPEECH_PITCH: lnote(x, val, base); return;
     case P_LEGATO: lput(x, val ? "ON" : "OFF", base); return;
+    case P_BEND_MODE:
+        lput(x, (val & 1) ? "STEP" : "SLIDE", base);
+        if (val >> 1) lput(x + ((val & 1) ? 5 : 6), (val >> 1) == 1 ? "CLICK" : "CLK L", base);
+        return;
     case P_PHONEME:
         x = lnum(x, val, base);
         lputn(x + 1, &phoneme_names[(uint16_t)val * 2], 2, base);
@@ -259,11 +264,11 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
 
 /* ------------------------------------------------------------------ param list */
 static const uint8_t order_pulse[] = { P_LEVEL, P_PAN, P_SHAPE, P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_LEGATO,
-                                       P_BEND, P_DETUNE, P_PENV_AMT, P_PENV_TIME, P_SWEEP, P_LFO_SHAPE, P_LFO_RATE,
+                                       P_BEND, P_DETUNE, P_PENV_AMT, P_PENV_TIME, P_BEND_MODE, P_SWEEP, P_LFO_SHAPE, P_LFO_RATE,
                                        P_LFO_DEPTH, P_LFO_DEST, P_LFO_DELAY, 0xFF };
 static const uint8_t order_wave[] = { P_MODE, P_SHAPE, P_TIMBRE, P_SPEECH_PITCH, P_PHONEME, P_LEVEL, P_PAN,
                                       P_ATTACK, P_DECAY, P_RELEASE, P_GLIDE, P_LEGATO, P_BEND, P_DETUNE, P_PENV_AMT,
-                                      P_PENV_TIME, P_LFO_SHAPE, P_LFO_RATE, P_LFO_DEPTH, P_LFO_DEST,
+                                      P_PENV_TIME, P_BEND_MODE, P_LFO_SHAPE, P_LFO_RATE, P_LFO_DEPTH, P_LFO_DEST,
                                       P_LFO_DELAY, P_SPLIT, 0xFF };
 
 static void build_plist(void) {

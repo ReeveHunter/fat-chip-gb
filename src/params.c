@@ -26,6 +26,7 @@ const uint8_t param_cc[NUM_PARAMS] = {
     84, /* SPEECH pitch (wave) */
     86, /* PHONEME (wave, sing mode) */
     68, /* LEGATO (standard legato footswitch CC) */
+    89, /* BEND SHAPE (v0.12: SLIDE / STEP, CLICK) */
 };
 
 /* user map (DAW profile); FAT CHIP profile always uses param_cc */
@@ -59,15 +60,15 @@ uint8_t cc_map_custom(void) {
 
 /* 1 = CC value is used directly (clamped), 0 = CC 0..127 scaled to 0..max */
 const uint8_t param_direct[NUM_PARAMS] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1,
 };
 
-/*                         LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO LEG */
+/*                         LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO LEG BSH */
 const uint8_t param_max[4][NUM_PARAMS] = {
-    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1 },
-    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1 },
-    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1 },
-    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
+    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1, 5 },
+    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1, 5 },
+    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1, 1 },
+    /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
 };
 
 const uint8_t voice_type[NUM_VOICES] = { VT_PULSE, VT_PULSE, VT_WAVE, VT_NOISE, VT_DRUM };

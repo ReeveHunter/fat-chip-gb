@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.11"
+#define VERSION_STR "0.12"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -46,6 +46,7 @@ enum {
     P_SPEECH_PITCH,
     P_PHONEME,
     P_LEGATO, /* overlapping notes glide/change pitch without retriggering */
+    P_BEND_MODE, /* v0.12: BEND IN's SHAPE (bit 0: STEP) and CLICK (value >> 1: OFF SHORT LONG) */
     NUM_PARAMS
 };
 

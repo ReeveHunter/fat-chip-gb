@@ -185,7 +185,7 @@ save stores it.
 | 78 | LFO destination (v0.10: shown as VIBRATO / PWM / AUTOPAN, or VIBRATO / TIMBRE / AUTOPAN on the wave) | pitch / duty / pan | pitch / timbre (PWM in Pulse) / pan | pitch / pan | |
 | 79 | LFO delay (fade-in after note) | ✓ | ✓ | ✓ | |
 | 80 | Pitch envelope amount (±24 semitones, 64 = off; v0.10: shown as BEND IN) | ✓ | ✓ | ✓ | |
-| 81 | Pitch envelope time (BEND TIME) | ✓ | ✓ | ✓ | |
+| 81 | Pitch envelope time (BEND TIME; with STEP: how long it's held, 17 ms to 1 s) | ✓ | ✓ | ✓ | |
 | 82 | Sweep (hardware, pulse 1 only) | ✓ | | | |
 | 83 | Drum split: notes below this play drums (value = note, 0 = off) | | ✓ | | |
 | 84 | Speech pitch (value = note) | | ✓ | | |
@@ -193,6 +193,7 @@ save stores it.
 | 86 | Phoneme for Sing mode (value = index) | | ✓ | | |
 | 87 | Release drop (v0.09): a note let go sags this many semitones while it rings (0–24, 0 = off). Not saved | ✓ | ✓ | ✓ | |
 | 88 | Release drop time (0–127, in 16 steps like the pitch envelope's). Not saved | ✓ | ✓ | ✓ | |
+| 89 | BEND SHAPE (v0.12, value as it is): + 1 STEP (held AMOUNT away for BEND TIME, then the note: the blip; SLIDE without), + 2 CLICK SHORT (the note starts with 20 ms of noise on the noise channel) or + 4 CLICK LONG (as long as BEND TIME), while the noise voice is silent | ✓ | ✓ | STEP | |
 | 94 | Fine detune (±50 cents) | ✓ | ✓ | | |
 | 68 | Legato on/off (≥64 = on) | ✓ | ✓ | ✓ | |
 
