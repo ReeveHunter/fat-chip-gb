@@ -107,5 +107,22 @@ gb.off(3, 60)
 gb.off(0, 64)
 gb.run(30)
 
+# v0.16: BEND SHAPE bit 3: BEND IN x 2 (up to 4 octaves)
+gb.cc(0, 80, 127)                             # +24 (48 of 48)
+gb.cc(0, 81, 64)
+gb.cc(0, 89, 9)                               # STEP + x2: +48
+gb.cc(0, 1, 0)
+gb.run(3)
+gb.note(0, 48)
+seq = []
+for _ in range(20):
+    gb.run(1)
+    seq.append(semis(gb))
+held = [s for s in seq[:10] if s is not None]
+check("STEP x2 (+24 doubled): four octaves up, held, then the note", held and all(abs(s - 96) < 0.3 for s in held) and abs(seq[-1] - 48) < 0.3,
+      [round(x, 1) for x in seq if x is not None][:14])
+gb.off(0, 48)
+gb.run(30)
+
 print(f"\n{fails} failure(s)")
 sys.exit(1 if fails else 0)

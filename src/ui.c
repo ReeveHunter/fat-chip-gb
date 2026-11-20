@@ -229,7 +229,7 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
     case P_DETUNE: lsigned(x, (int16_t)val - 32, base); return;
     case P_PENV_AMT:
         if (val == 24) { lput(x, "OFF", base); return; }
-        x = lsigned(x, (int16_t)val - 24, base);
+        x = lsigned(x, ((int16_t)val - 24) * ((patch[v][P_BEND_MODE] & 8) ? 2 : 1), base);   /* (v0.16: x 2) */
         lput(x + 1, "SEMI", base);
         return;
     case P_SWEEP:
@@ -251,8 +251,15 @@ static void lvalue(uint8_t x, uint8_t v, uint8_t p, uint8_t base) {
     case P_SPEECH_PITCH: lnote(x, val, base); return;
     case P_LEGATO: lput(x, val ? "ON" : "OFF", base); return;
     case P_BEND_MODE:
-        lput(x, (val & 1) ? "STEP" : "SLIDE", base);
-        if (val >> 1) lput(x + ((val & 1) ? 5 : 6), (val >> 1) == 1 ? "CLICK" : "CLK L", base);
+        /* 8 tiles: SLIDE / STEP, or SLD / STP + C (CLICK) / CL (LONG CLICK) + X2 */
+        if (!(val & 14)) { lput(x, (val & 1) ? "STEP" : "SLIDE", base); return; }
+        lput(x, (val & 1) ? "STP" : "SLD", base);
+        x += 3;
+        if (val & 6) {
+            lput(x, (val & 6) == 2 ? "+C" : "+CL", base);
+            x += (val & 6) == 2 ? 2 : 3;
+        }
+        if (val & 8) lput(x, "X2", base);
         return;
     case P_PHONEME:
         x = lnum(x, val, base);

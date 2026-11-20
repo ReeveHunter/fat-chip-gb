@@ -65,9 +65,9 @@ const uint8_t param_direct[NUM_PARAMS] = {
 
 /*                         LVL PAN SHP TMB MOD ATK DEC REL GLD BND DET PEA PET SWP LSH LRT LDP LDS LDL SPL SPP PHO LEG BSH */
 const uint8_t param_max[4][NUM_PARAMS] = {
-    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1, 5 },
-    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1, 5 },
-    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1, 1 },
+    /* PULSE */ { 15, 2, 3, NA, NA, 7, 7, 7, 15, 24, 63, 48, 15, 15, 4, 31, 31, 2, 15, NA, NA, NA, 1, 13 },
+    /* WAVE  */ { 15, 2, 15, 15, WM_COUNT - 1, 7, 7, 7, 15, 24, 63, 48, 15, NA, 4, 31, 31, 2, 15, 127, 127, SPEECH_PHONEMES - 1, 1, 13 },
+    /* NOISE */ { 15, 2, 1, NA, NA, 7, 7, 7, 15, 24, NA, 48, 15, NA, 4, 31, 31, 1, 15, NA, NA, NA, 1, 9 },
     /* DRUM  */ { 15, 2, DRUM_KITS - 1, 24, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA },
 };
 

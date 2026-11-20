@@ -465,11 +465,11 @@ static void start_note(uint8_t v, uint8_t note, uint8_t vel, uint8_t retrig) {
     if (!(pp[P_GLIDE] && (was_playing || !retrig))) vo->pitch = base;
     if (!retrig) return; /* legato return to an older held note: pitch only */
 
-    vo->penv = ((int16_t)pp[P_PENV_AMT] - 24) << 8;
+    vo->penv = ((int16_t)pp[P_PENV_AMT] - 24) << ((pp[P_BEND_MODE] & 8) ? 9 : 8);   /* (v0.16 bit 3: x 2) */
     step_left[v] = ((pp[P_BEND_MODE] & 1) && vo->penv) ? step_frames[pp[P_PENV_TIME] & 15] : 0;
     if (type == VT_NOISE) click_left = 0;   /* (the noise voice takes its channel back) */
-    else if (pp[P_BEND_MODE] >> 1)
-        click_start(vel_vol(vel, pp[P_LEVEL]), pp[P_BEND_MODE] >> 1, step_frames[pp[P_PENV_TIME] & 15]);
+    else if (pp[P_BEND_MODE] & 6)
+        click_start(vel_vol(vel, pp[P_LEVEL]), (pp[P_BEND_MODE] >> 1) & 3, step_frames[pp[P_PENV_TIME] & 15]);
     vo->lfo_phase = 0x4000;
     vo->lfo_wait = pp[P_LFO_DELAY] << 3;
     vo->env_acc = 0;
