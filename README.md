@@ -221,7 +221,7 @@ follows, are in [`docs/fatchip-protocol.md`](docs/fatchip-protocol.md).
 | 111 | Panic |
 | 112 | Display: 0 = screen on, 1 = screen off |
 | 113 | Channels (v0.08), heard on **any** channel: 64 + n moves the five voices to channels n+1–n+5 (74 = 11–15). Fat Chip 64 sends it at startup, so you don't have to set channels by hand. Not saved |
-| 114 | Fat Chip sound (v0.10): n = Fat Chip 64's built-in sound n on pulse 1, pulse 2 and the wave, with its name. Fat Chip 64 sends it instead of the sound's 45-odd CCs. 64 + n (v0.11): Fat Chip 64's status every few seconds: names the cards (127: CUSTOM), and right after power-on it also sets the FAT CHIP profile and plays the sound, so a Game Boy switched on late catches up |
+| 114 | Fat Chip sound (v0.10): n = Fat Chip 64's built-in sound n on pulse 1, pulse 2 and the wave, with its name. Fat Chip 64 sends it instead of the sound's 45-odd CCs. 64 + n (v0.11): Fat Chip 64's status after a sound sent as CCs: names the cards (127: CUSTOM), and right after power-on it also sets the FAT CHIP profile and plays the sound, for a Game Boy switched on late (Fat Chip 64: CTRL + S off and on resends everything) |
 
 Setup's bottom line shows the current tune, tempo and latch; the home header
 blinks a note on each beat once a tempo has been sent.
