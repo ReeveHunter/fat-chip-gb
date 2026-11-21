@@ -658,14 +658,21 @@ void latch_set(uint8_t on) {
     }
 }
 
-/* v0.13: tremolo on the master volume (NR50), like the SID's: no clicks.
+/* v0.13: tremolo on the master volume (NR50), like the SID's.
+   v0.18: on real hardware every NR50 step jumps the DC of each channel whose
+   DAC is on, silent or not, so the tremolo clicked. Now the frame tick only
+   sets a target (nr50_tgt) and the timer interrupt walks NR50 there a step
+   at a time (~340 a second), and while a tremolo runs, a channel that's been
+   silent for a few frames has its DAC switched off, so it adds no DC.
    A phase per frame from the rate (FREE, Hz x 100) or the tempo (a SYNC
    division, back to the start of its cycle on the downbeat); the shape gives
    an amount 0-127, the depth (0-15) how much of the volume it takes. */
 uint8_t trem_depth, trem_shape, trem_sync, trem_rmsb;
 uint16_t trem_rate;
 static uint16_t trem_phase, trem_inc;
-static uint8_t trem_rnd, nr50_shadow = 0x77;
+static uint8_t trem_rnd;
+uint8_t nr50_tgt = 0x77, nr50_cur = 0x77;   /* (isr.s steps nr50_cur towards nr50_tgt) */
+
 static const uint8_t trem_cyc[10] = { 0, 96, 48, 24, 18, 12, 8, 6, 4, 3 }; /* clocks (24 a beat) */
 static const uint8_t trem_gates[3] = { 0xAD, 0xDA, 0x92 };              /* X.X.XX.X XX.XX.X. X..X..X. */
 
@@ -696,9 +703,11 @@ static void trem_tick(void) {
     uint8_t x, a, att, vol;
     uint16_t old;
     if (!trem_depth) {
-        if (nr50_shadow != 0x77) NR50_REG = nr50_shadow = 0x77;
+        nr50_tgt = 0x77;
+        idle_frames[0] = idle_frames[1] = idle_frames[2] = idle_frames[3] = 0;
         return;
     }
+    idle_dacs();
     old = trem_phase;
     trem_phase += trem_inc;
     if (trem_phase < old) trem_rnd = rand8() >> 1;
@@ -721,8 +730,7 @@ static void trem_tick(void) {
     }
     att = (uint8_t)(((uint16_t)trem_depth * a * 2 + 127) >> 8); /* 0-15 (depth 15, a 127: 15) */
     vol = 7 - (uint8_t)(((uint16_t)att * 15) >> 5);            /* 7 .. 0 */
-    vol |= vol << 4;
-    if (vol != nr50_shadow) NR50_REG = nr50_shadow = vol;
+    nr50_tgt = vol | (vol << 4);
 }
 
 void global_cc(uint8_t cc, uint8_t val) {
@@ -1194,7 +1202,7 @@ void synth_init(void) {
     }
 
     NR52_REG = 0x80;
-    NR50_REG = 0x77;
+    NR50_REG = nr50_cur = nr50_tgt = 0x77;
     NR51_REG = 0xFF;
     nr51_shadow = 0xFF;
     NR10_REG = 0;

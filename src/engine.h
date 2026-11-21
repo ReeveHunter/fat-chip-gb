@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include <stdint.h>
 
-#define VERSION_STR "0.17"
+#define VERSION_STR "0.18"
 
 /* ------------------------------------------------------------------ voices */
 #define V_PU1 0
@@ -206,6 +206,8 @@ void drum_mix(void);           /* both streams playing: mix the chunk after it *
 #define MIX_TAB ((uint8_t *)0xDB00)
 extern uint8_t noise_drum, click_left;
 uint8_t noise_hat(uint8_t slot, uint8_t vel) BANKED;   /* hats.c */
+void idle_dacs(void) BANKED;                          /* hats.c (v0.18) */
+extern uint8_t idle_frames[4];
 uint8_t vel_vol(uint8_t vel, uint8_t level);           /* velocity x level -> 0..15 */
 void wave_commit(void);        /* load wave_buf into wave RAM and trigger */
 void sio_isr(void);

@@ -9,6 +9,7 @@
         SB      = 0x01
         SC      = 0x02
         NR30    = 0x1A
+        NR50    = 0x24
         NR33    = 0x1D
         NR34    = 0x1E
         RX_PAGE = 0xDC
@@ -60,6 +61,22 @@ _sio_isr::
 ; interrupts back on (MIDI keeps coming) and mixes the chunk after it.
 _tim_isr::
         push    af
+        push    hl              ; v0.18: walk the master volume a step towards
+        ld      hl,#_nr50_cur   ; the tremolo's target (both sides at once)
+        ld      a,(_nr50_tgt)
+        cp      (hl)
+        jr      z,8$
+        ld      a,(hl)
+        jr      c,7$            ; (target below: down)
+        add     a,#0x11
+        jr      6$
+7$:
+        sub     #0x11
+6$:
+        ld      (hl),a
+        ldh     (NR50),a
+8$:
+        pop     hl
         ld      a,(_st_active)
         or      a
         jr      z,9$

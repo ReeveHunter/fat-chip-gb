@@ -34,3 +34,21 @@ uint8_t noise_hat(uint8_t slot, uint8_t vel) BANKED {
     noise_drum = hat_frames[h];
     return 1;
 }
+
+/* v0.18: while a tremolo runs (synth.c trem_tick), a channel silent for
+   DAC_OFF_AFTER frames has its DAC switched off (one small step, once), so
+   the master volume's steps don't move its DC (the clicks on hardware) */
+#define DAC_OFF_AFTER 10
+uint8_t idle_frames[4];        /* frames each channel has been silent */
+static const uint16_t dac_reg[4] = { 0xFF12, 0xFF17, 0xFF1A, 0xFF21 };   /* NR12 NR22 NR30 NR42 */
+void idle_dacs(void) BANKED {
+    uint8_t v, idle;
+    for (v = 0; v < 4; v++) {
+        if (v == V_WAV) idle = (voice[V_WAV].env_stage == ENV_IDLE && wave_owner == WO_NONE && !st_active);
+        else if (v == V_NOI) idle = (voice[V_NOI].env_stage == ENV_IDLE && !noise_drum && !click_left);
+        else idle = (voice[v].env_stage == ENV_IDLE);
+        if (!idle) { idle_frames[v] = 0; continue; }
+        if (idle_frames[v] < DAC_OFF_AFTER && ++idle_frames[v] == DAC_OFF_AFTER)
+            *(volatile uint8_t *)dac_reg[v] = 0;
+    }
+}
