@@ -46,7 +46,9 @@ def patches(gb):
 
 
 ofs, data, names = table()
-check("the table: Fat Chip 64's 19 built-in sounds", len(ofs) == 19 and names[0] == "FAT", (len(ofs), names[:3]))
+src_names = re.findall(r"\{('.'(?:, '.')*)\}", open(GEN).read().split("fc_sound_names")[1].split("};")[0])
+N = len(ofs)   # (Fat Chip 64's built-in sounds: 25 since 2026-11-22, Reeve's Chip Lab patches)
+check(f"the table: Fat Chip 64's {N} built-in sounds", N >= 19 and len(names) == N, (N, names[:3]))
 
 for n in (0, 4, 13):
     a = GB(ROM, sram=bytes(8192))
@@ -99,7 +101,7 @@ g.run(3)
 g.press("right", 3)
 g.pb.button_release("select")
 g.run(10)
-check("... again: the next", g.var("_fc_cur") == (c0 + 1) % 19, g.var("_fc_cur"))
+check("... again: the next", g.var("_fc_cur") == (c0 + 1) % N, g.var("_fc_cur"))
 
 # ---------------------------------------------------------------- v0.11: the status (CC 114 = 64 + n)
 def name_of(g, v=0):
@@ -133,8 +135,9 @@ g.cc(10, 114, 64 + 13)
 g.run(10)
 p13 = patches(g)[:3 * PATCH_SIZE]
 same = all(p13[v * PATCH_SIZE:v * PATCH_SIZE + NAME] == edited[v * PATCH_SIZE:v * PATCH_SIZE + NAME] for v in range(3))
-check("synced: another sound's status only renames the cards (GLD BASS), the sound stays", same and name_of(g) == "GLD BASS"
-      and name_of(g, 2) == "GLD BASS" and g.var("_fc_cur") == 13, name_of(g))
+N13 = "".join(re.findall(r"'(.)'", src_names[13]))   # (the 8-character card name)
+check(f"synced: another sound's status only renames the cards ({names[13]}), the sound stays", same and name_of(g) == N13
+      and name_of(g, 2) == N13 and g.var("_fc_cur") == 13, name_of(g))
 g.cc(10, 114, 127)
 g.run(10)
 check("status 127: a sound of Fat Chip 64's own: CUSTOM", name_of(g) == "CUSTOM  " and name_of(g, 1) == "CUSTOM  " and g.var("_fc_cur") == 255,
@@ -148,7 +151,7 @@ p0 = patches(h)[:3 * PATCH_SIZE]
 h.cc(0, 114, 64 + 4)
 h.run(10)
 check("after Fat Chip 64's startup (CC 102 heard), a status doesn't reload, just names",
-      all(patches(h)[v * PATCH_SIZE:v * PATCH_SIZE + NAME] == p0[v * PATCH_SIZE:v * PATCH_SIZE + NAME] for v in range(3)) and name_of(h) == "WHISTLE ",
+      all(patches(h)[v * PATCH_SIZE:v * PATCH_SIZE + NAME] == p0[v * PATCH_SIZE:v * PATCH_SIZE + NAME] for v in range(3)) and name_of(h) == "".join(re.findall(r"'(.)'", src_names[4])),
       name_of(h))
 
 print(f"\n{fails} failure(s)")
